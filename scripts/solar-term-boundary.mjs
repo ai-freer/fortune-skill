@@ -6,6 +6,7 @@
  * 需要在报告中保守说明月令/月柱敏感。
  */
 
+import { pathToFileURL } from 'url';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -95,4 +96,4 @@ function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main();

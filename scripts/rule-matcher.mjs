@@ -8,7 +8,7 @@
  */
 
 import { spawnSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join } from 'path';
 import { loadReportFramework } from './report-framework.mjs';
 
@@ -446,4 +446,4 @@ function main() {
   process.stdout.write(JSON.stringify(matchClassicalRules(data), null, 2) + '\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
