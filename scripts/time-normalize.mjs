@@ -12,6 +12,7 @@
  *   4. 校正后时间 → 时辰
  */
 
+import { pathToFileURL } from 'url';
 import { findCity, TZ_STANDARD_LONGITUDE } from './city-data.mjs';
 import { solarTermBoundaryInfo } from './solar-term-boundary.mjs';
 
@@ -335,6 +336,6 @@ function main() {
   process.stdout.write(JSON.stringify(output, null, 2) + '\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
