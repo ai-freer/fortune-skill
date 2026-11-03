@@ -16,9 +16,20 @@ import subprocess
 import collections
 import re
 import calendar
+import hashlib
 
-# 引入 vendor/bazi 的数据模块
+# 引入 vendor/bazi 的数据模块（导入前校验完整性，防止被篡改的数据模块被静默加载）
 VENDOR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'vendor', 'bazi')
+_VENDOR_HASHES = {
+    "datas.py": "c2b10688e94046902979f8dacc2506c136951e5d1354c92763c9b93041e3436e",
+    "sizi.py": "ab23ea4c2d83c5060aa4994f275858be3801dc9a0f4db9d78b3282c3f4259052",
+    "yue.py": "3933e724f592bc9cbcb49eefda1052d23a7c58c48c2756b64e30fc10eb88cbc2",
+}
+for _vendor_file, _expected_sha256 in _VENDOR_HASHES.items():
+    with open(os.path.join(VENDOR_DIR, _vendor_file), "rb") as _f:
+        _actual_sha256 = hashlib.sha256(_f.read()).hexdigest()
+    if _actual_sha256 != _expected_sha256:
+        sys.exit(f"[bazi-classic] vendor/bazi/{_vendor_file} 完整性校验失败，拒绝加载不可信数据模块")
 sys.path.insert(0, VENDOR_DIR)
 
 from lunar_python import Lunar, Solar
