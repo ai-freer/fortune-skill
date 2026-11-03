@@ -1,5 +1,7 @@
 # Fortune Skill — 中国传统命理 AI 分析技能
 
+[简体中文](README.md) | [English](README.en-US.md)
+
 Source-available，非商用使用。详见 [LICENSE](LICENSE) 和
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
@@ -10,12 +12,14 @@ Source-available，非商用使用。详见 [LICENSE](LICENSE) 和
 > 不对应任何真实人物。请勿据此推算真人命盘或还原个人画像。
 >
 > 用户在本地使用本 Skill 生成的命理报告默认存放于 `reports/`，
-> 该目录已加入 `.gitignore`，不上传到任何远程仓库。如需提交相关变更，
+> 该目录已加入 `.gitignore`，默认不纳入 Git 提交；这不能防止强制添加或其他上传方式。如需提交相关变更，
 > 请先运行 `node scripts/privacy-check.mjs` 自查。
 
 ---
 
 ## 30 秒上手
+
+需要 Node.js 18+、npm、Python 3.9+ 和 pip。以下命令在仓库根目录运行。
 
 ```bash
 git clone https://github.com/ai-freer/fortune-skill.git
@@ -40,7 +44,7 @@ Trae）并把仓库 symlink 到对应 skill 目录。**重启 agent**，对话�
 
 ### 时间基准原则
 
-本项目以出生地校正后的地方视太阳时近似为排盘基准。用户提供的出生地民用钟表时间只作为原始输入，脚本会自动进行夏令时和地方视太阳时近似校正；未校正 Raw Time 不作为正式命盘依据。
+本项目先将出生地民用钟表时间（含当时夏令时）解析为唯一 UTC 瞬时，再按各项规则计算：年月柱、交节和大运使用固定 UTC+08:00 参考，日时柱与紫微使用地方视太阳时近似。不能用一个校正日期替代所有时基；未校正 Raw Time 不作为正式命盘依据。
 
 外部 benchmark 或预计算命盘如果使用未校正时间，其结果只用于研究参考，不作为本项目正确性标准。需要验证分析质量时，应使用本项目自己的时间校正规则重新排盘。
 
@@ -63,19 +67,19 @@ PolyForm Noncommercial License 1.0.0 发布，仅限非商用使用；这不是 
 核心排盘依赖优先选择成熟项目；第三方协议状态以实际仓库和
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 为准。
 
-| 项目 | ⭐ | 语言 | License | 最近更新 | 用途 |
-|------|-----|------|---------|---------|------|
-| [SylarLong/iztro](https://github.com/SylarLong/iztro) | 3,617 | TypeScript | MIT | 2026-04-15 | 紫微斗数排盘引擎（12 宫、运限、四化、三方四正、插件系统） |
-| [6tail/lunar-javascript](https://github.com/6tail/lunar-javascript) | 1,502 | JavaScript | MIT | 2026-04-30 | 万年历+八字排盘（四柱、十神、五行、大运、流年、神煞、纳音） |
-| [china-testing/bazi](https://github.com/china-testing/bazi) | 1,285 | Python | 未随附许可证 / 维护者确认分发权限 | 2026-02-03 | 三命通会论断、冲刑合会分析、五行分数、格局判定、合婚 |
-| [jinchenma94/bazi-skill](https://github.com/jinchenma94/bazi-skill) | 1,208 | Markdown | MIT | 2026-04-04 | 分析流程框架 + 经典典籍 references（穷通宝典等九本） |
+| 项目 | 语言 | License | 用途 |
+|------|------|------|------|
+| [SylarLong/iztro](https://github.com/SylarLong/iztro) | TypeScript | MIT | 紫微斗数排盘引擎（12 宫、运限、四化、三方四正、插件系统） |
+| [6tail/lunar-javascript](https://github.com/6tail/lunar-javascript) | JavaScript | MIT | 万年历+八字排盘（四柱、十神、五行、大运、流年、神煞、纳音） |
+| [china-testing/bazi](https://github.com/china-testing/bazi) | Python | 未随附许可证 / 维护者确认分发权限 | 三命通会论断、冲刑合会分析、五行分数、格局判定、合婚 |
+| [jinchenma94/bazi-skill](https://github.com/jinchenma94/bazi-skill) | Markdown | MIT | 分析流程框架 + 经典典籍 references（穷通宝典等九本） |
 
 ### 参考项目（不直接依赖）
 
-| 项目 | ⭐ | 参考价值 |
-|------|-----|---------|
-| [hhszzzz/taibu](https://github.com/hhszzzz/taibu) | 119 | AGENTS.md / CLAUDE.md 的 agent 友好设计、MCP 工具定义方式、taibu-core 的 API 设计思路 |
-| [DestinyLinker/MingLi-Bench](https://github.com/DestinyLinker/MingLi-Bench) | 133 | LLM 命理评测基准（160 道题），可作为题库和评测流程参考；若预计算命盘未校正地方视太阳时近似，不作为本项目排盘标准 |
+| 项目 | 参考价值 |
+|------|------|
+| [hhszzzz/taibu](https://github.com/hhszzzz/taibu) | AGENTS.md / CLAUDE.md 的 agent 友好设计、MCP 工具定义方式、taibu-core 的 API 设计思路 |
+| [DestinyLinker/MingLi-Bench](https://github.com/DestinyLinker/MingLi-Bench) | LLM 命理评测基准（160 道题），可作为题库和评测流程参考；若预计算命盘未校正地方视太阳时近似，不作为本项目排盘标准 |
 
 ---
 
@@ -134,7 +138,7 @@ fortune-skill/
 └──────────────────────────────────────────────────┘
 ```
 
-Layer 1 保证排盘精确（LLM 自己算干支会出错），Layer 2 提供系统化的专业知识，Layer 3 发挥 LLM 的综合分析和表达能力。
+Layer 1 按明确规则计算排盘（精度限制见下文，LLM 不自行推算干支），Layer 2 提供系统化的专业知识，Layer 3 发挥 LLM 的综合分析和表达能力。
 
 ### 报告增强脚本
 
@@ -153,6 +157,7 @@ Layer 1 保证排盘精确（LLM 自己算干支会出错），Layer 2 提供系
 说明：历史经历不是默认产品化输入，只有用户主动提供时才作为可选校准材料；贵人也不是默认专项报告，只有用户明确询问人脉、平台资源或贵人问题时才单独展开。
 
 `hecan-summary` v2 判断卡片包含：
+
 - `evidenceNodes[]`：字段级证据节点，含 `source`、`system`、`layer`、`aspect`、`fieldPath`、`polarity` 和 `weight`。
 - `counterEvidence[]`：反证或约束，覆盖八字/紫微信号冲突、规则缺失、覆盖不足、时间可靠性、未校准、反向例和漏触发。
 - `coverage`：每个领域的最低证据要求、必要来源、已覆盖来源、缺口和正文必须承接的现实边界。
@@ -179,7 +184,7 @@ Layer 1 保证排盘精确（LLM 自己算干支会出错），Layer 2 提供系
 ```bash
 npm ci
 python3 -m pip install -r requirements.txt
-npm run verify        # 26 项自检
+npm run verify        # 完整自检，项目数以运行输出为准
 ```
 
 **单脚本快速验证**（出生信息为虚构演示数据）：
@@ -220,6 +225,7 @@ node scripts/hecan-audit.mjs --solar "1990-05-15" --hour 15 --gender male --birt
 ### 2. exec 调用（零服务集成）
 
 所有计算通过 exec 调用命令行脚本。不需要 MCP 协议、HTTP Server、特殊 SDK；克隆后按“安装”章节安装 Node.js 和 Python 依赖即可使用。任何能执行 shell 命令的 agent 都能用：
+
 - OpenClaw → exec tool
 - Claude Code → bash tool
 - Codex → terminal
@@ -266,7 +272,7 @@ references/ 目录的 Markdown 文件在分析阶段被读入 agent 上下文。
 
 ### 6. 错误处理对 agent 友好
 
-脚本在输入错误时返回结构化错误 JSON（不是 traceback），让 agent 能理解并重试：
+脚本对已处理的输入和计算错误返回结构化 JSON，便于 agent 理解并重试；调用方还应检查退出码和 stderr，参数解析或依赖启动失败不保证返回 JSON：
 
 ```json
 { "error": "invalid_date", "message": "日期格式错误，请使用 YYYY-MM-DD", "input": "1990/5/15" }
@@ -292,13 +298,15 @@ references/ 目录的 Markdown 文件在分析阶段被读入 agent 上下文。
 ### Wrapper 方案
 
 `scripts/bazi-classic.py` 做一层 wrapper：
+
 1. `sys.path.insert` 引入 `vendor/bazi/`
 2. 接收命令行参数（阳历日期、时间、性别）
-3. 调用 bazi.py 的核心函数
-4. 捕获 print 输出，解析提取关键数据
+3. 调用时间校正及历法适配器，结合 lunar-python 和 vendor 数据模块计算
+4. 直接组织经典论断、关系、分数等结果
 5. 输出结构化 JSON 到 stdout
 
 提取的数据：
+
 - 三命通会论断文本（sizi.py 的 summarys）
 - 冲刑合会关系
 - 五行分数
@@ -344,6 +352,7 @@ python3 scripts/bazi-classic.py --solar "1990-05-15" --hour 15 --minute 0 --gend
 Agent 读取 references/ 中的典籍规则，结合三份排盘数据，按 SKILL.md 定义的分析框架输出：
 
 **八字分析：**
+
 1. 日主强弱（得令、得地、得势）
 2. 十神分析与六亲关系
 3. 五行平衡与喜用神（参考穷通宝典调候）
@@ -353,6 +362,7 @@ Agent 读取 references/ 中的典籍规则，结合三份排盘数据，按 SKI
 7. 综合建议（事业、财运、感情、健康）
 
 **紫微分析：**
+
 1. 命宫主星与格局
 2. 十二宫逐宫分析
 3. 四化飞星与三方四正
@@ -374,7 +384,7 @@ Agent 读取 references/ 中的典籍规则，结合三份排盘数据，按 SKI
 
 ## 时间校正
 
-本项目坚持地方视太阳时近似为正式排盘基准。出生地民用钟表时间仅用于记录用户原始输入；若时间校正导致时辰变化，应以校正后的时辰排盘，并在报告中说明差异。
+日时柱与紫微采用地方视太阳时近似；年月柱、交节和大运采用下文说明的 UTC+08:00 参考。出生地民用钟表时间用于记录原始输入；若校正导致时辰变化，应在适用计算中采用校正后的时辰，并在报告中说明差异。
 
 出生地是必填项。系统会在排盘前调用 `scripts/time-normalize.mjs` 完成：
 
@@ -392,6 +402,7 @@ npm test
 ```
 
 验证覆盖：
+
 - 时间校正有效案例和非法日期错误。
 - 三个排盘脚本的关键字段。
 - 八字流年快查。
@@ -447,3 +458,7 @@ npm run privacy-check
 `npm test` / `npm run verify` 运行完整回归。`node scripts/privacy-check.mjs` 检查 staged 新增内容；`--tracked` 检查索引中的全部源码路径及密钥形状，适用于 CI；`--no-git` 只校验策略加载，不扫描内容。隐私检查是启发式检查，不能代替人工检查。
 
 `.skill-publish-ignore` 为技能打包排除规则；其他打包工具未必读取它。个人报告、开发归档、环境文件和工具记忆应始终排除，发布前需检查实际产物。
+
+## 翻译贡献
+
+英文 README 基于 [@webbrain-one 在 PR #3 中贡献的译文](https://github.com/ai-freer/fortune-skill/pull/3)（版本 `7bce8bd24f140ec8925b213afb5328df455ff36e`），并按当前代码和中文 README 更新术语与行为说明。继续适用仓库 [LICENSE](LICENSE) 及其必需声明，不改变第三方材料的权利状态。
