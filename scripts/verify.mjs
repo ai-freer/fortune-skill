@@ -48,6 +48,10 @@ function assert(condition, message) {
 
 const checks = [
   {
+    label: 'explicit daily query context and workflow regressions',
+    run() { process.stdout.write(run(this.label, node, ['scripts/verify-daily-context.mjs']).stdout); }
+  },
+  {
     label: 'classical month data has complete unique keys and distinct lookup results',
     run() { process.stdout.write(run(this.label, python, ['scripts/verify-vendor-data.py']).stdout); }
   },

@@ -462,3 +462,13 @@ npm run privacy-check
 ## 翻译贡献
 
 英文 README 基于 [@webbrain-one 在 PR #3 中贡献的译文](https://github.com/ai-freer/fortune-skill/pull/3)（版本 `7bce8bd24f140ec8925b213afb5328df455ff36e`），并按当前代码和中文 README 更新术语与行为说明。继续适用仓库 [LICENSE](LICENSE) 及其必需声明，不改变第三方材料的权利状态。
+
+## 流日历法查询
+
+查询某地、某个民用时刻的日干支及年月背景，不需要伪造出生资料：
+
+```bash
+node scripts/daily-context.mjs --date "2026-07-05" --hour 12 --minute 0 --location "北京"
+```
+
+查询地不是默认出生地。“今天”须先按查询地确定；日期、小时和城市必填，分钟默认 0。输出只代表该参考时刻，太阳钟换日或交节可能使民用一天内的干支变化。复用固定时区、均时差近似及边界拒绝规则；失败不回退原始时间。该入口不输出个人评分或指定日期的紫微流日。个性化解释仍须结合本命盘，完整流程见 `SKILL.md`。

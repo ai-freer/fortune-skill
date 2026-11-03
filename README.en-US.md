@@ -475,3 +475,13 @@ The `trueSolarTime` field is retained for compatibility. `method: local_apparent
 ## Translation Credit
 
 Adapted from the English translation contributed by [@webbrain-one in PR #3](https://github.com/ai-freer/fortune-skill/pull/3) (revision `7bce8bd24f140ec8925b213afb5328df455ff36e`), with terminology and behavior updated against the current code and Chinese README. The repository's [LICENSE](LICENSE) and required notices remain applicable; this adaptation does not relicense third-party materials.
+
+## Daily Calendar Context
+
+Query day stems/branches and year/month context for an explicit civil date, time, and location without inventing birth data:
+
+```bash
+node scripts/daily-context.mjs --date "2026-07-05" --hour 12 --minute 0 --location "北京"
+```
+
+The query location is not automatically the birthplace. Resolve “today” in that location first; date, hour, and city are required, with minute defaulting to 0. Output represents only the reference instant: solar midnight or a solar-term transition can change the pillars within one civil day. Fixed timezone data, equation-of-time approximation, and boundary rejection rules are reused; failures do not fall back to raw time. This endpoint provides neither personal scores nor Ziwei daily transits for a specified date. Personalized interpretation still requires the natal chart; see `SKILL.md` for the full workflow.
