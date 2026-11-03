@@ -3,6 +3,7 @@
  * Minimal regression checks for the fortune skill command-line tools.
  */
 
+import { pythonExecutable } from './python-runtime.mjs';
 import { spawnSync } from 'child_process';
 import { writeFileSync, rmSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -13,12 +14,12 @@ const __dirname = dirname(__filename);
 const root = join(__dirname, '..');
 
 const node = process.execPath;
-const python = process.env.PYTHON || 'python3';
+const python = pythonExecutable();
 
 function run(label, command, args, expectCode = 0) {
   const result = spawnSync(command, args, {
     cwd: root,
-    env: { ...process.env, NODE: process.execPath },
+    env: { ...process.env, NODE: process.execPath, PYTHON: python },
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024
   });
@@ -47,6 +48,10 @@ function assert(condition, message) {
 }
 
 const checks = [
+  {
+    label: 'Python artifact locks and advisory status contracts',
+    run() { run(this.label, python, ['scripts/verify-python-supply-chain.py']); }
+  },
   {
     label: 'explicit daily query context and workflow regressions',
     run() { process.stdout.write(run(this.label, node, ['scripts/verify-daily-context.mjs']).stdout); }

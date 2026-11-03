@@ -52,7 +52,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install Python dependencies
-        run: python3 -m pip install -r requirements.txt
+        run: python3 scripts/install-python.py
 
       - name: Run verify suite
         run: npm run verify
@@ -74,3 +74,28 @@ jobs:
         with:
           scandir: '.'
           severity: warning
+
+  python-install:
+    name: Python install (${{ matrix.os }} · ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ['3.11']
+        include:
+          - os: ubuntu-latest
+            python: '3.9'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: npm ci --no-audit --no-fund
+      - run: python scripts/install-python.py
+      - run: python scripts/install-python.py --environment current
+      - run: python scripts/verify-python-install.py

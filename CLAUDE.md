@@ -7,7 +7,7 @@
 ```bash
 # 安装依赖
 npm ci
-python3 -m pip install -r requirements.txt
+python3 scripts/install-python.py
 
 # 运行排盘（三个脚本可并行）
 node scripts/bazi-chart.mjs --solar "1990-05-15" --hour 15 --gender male --birthplace "上海"
@@ -53,3 +53,7 @@ python3 scripts/bazi-classic.py --solar "1990-05-15" --hour 15 --gender male --b
 ## 当前时间实现边界
 
 以唯一出生 UTC 瞬时计算不同规则所需的时钟；年月柱/交节、大运使用 UTC+08:00 参考，日时柱与紫微使用地方视太阳钟近似，不能统一替换为同一种日历标签。算法、固定时区版本、精度拒绝窗口及历史限制见 `references/time-basis.md`。
+
+## Python 环境偏好
+
+用户明确指定已有解释器、全局或用户级环境时，必须将其作为 `PYTHON` 传给安装和每次 Agent 调用，不得忽略该偏好强制切回 `.venv`。未指定时，新安装默认项目环境；已有安装仍按解释器选择规则兼容。专用环境用于依赖隔离，不是安全沙箱。

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pythonExecutable } from './python-runtime.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, symlinkSync, readlinkSync, existsSync, realpathSync } from 'node:fs';
@@ -10,8 +11,8 @@ import { findCity } from './city-data.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const node = process.execPath;
-const python = process.env.PYTHON || 'python3';
-const env = { ...process.env, NODE: node };
+const python = pythonExecutable();
+const env = { ...process.env, NODE: node, PYTHON: python };
 const birth = ['--solar', '1990-05-15', '--hour', '15', '--gender', 'male', '--birthplace', '上海'];
 let checks = 0;
 function check(label, fn) { fn(); checks++; console.log(`ok - ${label}`); }
@@ -153,7 +154,7 @@ try {
   ]) writeFileSync(join(bin, name), script, { mode: 0o755 });
   const link = join(agentRoot, '.codex/skills/fortune');
   symlinkSync(oldTarget, link, 'dir');
-  const installEnv = { ...env, PATH: `${bin}:${env.PATH}`, FORTUNE_TEST_AGENT_ROOT: agentRoot };
+  const installEnv = { ...env, PYTHON: join(bin, 'python3'), PATH: `${bin}:${env.PATH}`, FORTUNE_TEST_AGENT_ROOT: agentRoot };
   check('installer fails if verify fails and replaces old directory symlinks safely', () => {
     const r = run('bash', ['install.sh'], 1, { cwd: installRoot, env: { ...installEnv, FORTUNE_TEST_VERIFY_EXIT: '7', TMPDIR: temp } });
     assert.ok(!r.stdout.includes('安装完成'));

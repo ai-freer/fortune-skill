@@ -7,6 +7,10 @@ bazi-classic.py — 三命通会 + 经典八字分析（基于 china-testing/baz
 输出: JSON 到 stdout，日志到 stderr
 """
 
+from python_runtime import use_project_python
+if __name__ == '__main__':
+    use_project_python()
+
 from calendar_basis import calendar_basis
 import sys
 import os

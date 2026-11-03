@@ -1,0 +1,22 @@
+name: Python dependency advisories
+permissions:
+  contents: read
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 8 * * 1'
+jobs:
+  audit:
+    name: Runtime advisories (exit 2 means incomplete coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Query published runtime advisories
+        run: python scripts/python-audit.py

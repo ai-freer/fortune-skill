@@ -183,7 +183,7 @@ Layer 1 按明确规则计算排盘（精度限制见下文，LLM 不自行推�
 
 ```bash
 npm ci
-python3 -m pip install -r requirements.txt
+python3 scripts/install-python.py
 npm run verify        # 完整自检，项目数以运行输出为准
 ```
 
@@ -472,3 +472,11 @@ node scripts/daily-context.mjs --date "2026-07-05" --hour 12 --minute 0 --locati
 ```
 
 查询地不是默认出生地。“今天”须先按查询地确定；日期、小时和城市必填，分钟默认 0。输出只代表该参考时刻，太阳钟换日或交节可能使民用一天内的干支变化。复用固定时区、均时差近似及边界拒绝规则；失败不回退原始时间。该入口不输出个人评分或指定日期的紫微流日。个性化解释仍须结合本命盘，完整流程见 `SKILL.md`。
+
+## Python 安装加固
+
+未设置 `PYTHON` 时，`python3 scripts/install-python.py` 创建／复用项目 `.venv`，按固定 SHA-256 安装运行依赖，无需激活，也不修改全局包。Node 与直接经典脚本均优先使用 `PYTHON` 覆盖，其次项目环境，最后兼容旧系统环境。源码包构建工具未纳入哈希锁，不能将此称为完整供应链验证。详情见 [Python 安装与供应链边界](references/python-supply-chain.md)。
+
+已有全局环境可以继续使用；新安装默认项目环境，显式 `PYTHON` 优先。`--environment current` 可按哈希安装到所选解释器，`--user` 可选择用户级安装；运行偏好由 Agent 环境中的 `PYTHON` 保持，不自动改写 shell 配置。venv 是依赖隔离，不是安全沙箱。
+
+依赖升级与用户更新步骤见 [依赖维护清单](references/python-supply-chain.md#dependency-maintenance)。

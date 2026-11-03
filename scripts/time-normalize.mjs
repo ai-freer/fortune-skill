@@ -12,6 +12,7 @@
  *   4. 校正后时间 → 时辰
  */
 
+import { pythonExecutable } from './python-runtime.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { solarClock, clockParts } from './solar-clock.mjs';
@@ -110,7 +111,7 @@ export function getUTCOffset(y, m, d, h, minute, timezone) {
 }
 
 export function detectDST(dateStr, hour, minute, timezone) {
-  const result = spawnSync(process.env.PYTHON || 'python3',
+  const result = spawnSync(pythonExecutable(),
     [fileURLToPath(new URL('./timezone-resolve.py', import.meta.url)), dateStr,
       String(hour), String(minute), timezone], { encoding: 'utf8', timeout: 10000 });
   let data;

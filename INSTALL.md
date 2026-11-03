@@ -8,7 +8,7 @@
 
 仓库根目录提供 [`install.sh`](./install.sh)，会自动：
 
-1. 安装 Node.js 与 Python 依赖
+1. 安装 Node.js 依赖，并在项目 `.venv` 中按 SHA-256 校验安装 Python 运行依赖
 2. 检测本地存在哪些 agent 平台（Claude Code / Codex / Cursor / Trae）
 3. 把仓库 symlink 到所有已检测到平台的 skill 目录
 4. 跑一次 `npm run verify` 验证安装
@@ -42,8 +42,8 @@ OS：macOS / Linux / Windows（WSL 推荐）。Windows 原生 PowerShell 可参�
 git clone https://github.com/ai-freer/fortune-skill.git ~/.claude/skills/fortune
 cd ~/.claude/skills/fortune
 npm ci
-python3 -m pip install -r requirements.txt
-npm run verify       # 26 测试
+python3 scripts/install-python.py
+npm run verify       # 完整自检，数量以输出为准
 ```
 
 重启 Claude Code（或新开会话），对话里直接说"算八字"等触发词即可。
@@ -57,7 +57,7 @@ npm run verify       # 26 测试
 ```bash
 git clone https://github.com/ai-freer/fortune-skill.git ~/.claude/skills/fortune
 cd ~/.claude/skills/fortune
-npm ci && python3 -m pip install -r requirements.txt
+npm ci && python3 scripts/install-python.py
 ```
 
 **触发**：重启 Claude Code 后，对话中提到 `算命 / 算八字 / 紫微 / 我的运势 / 合婚` 等触发词，会自动加载本 skill 的 `SKILL.md` 并按其流程引导用户。
@@ -67,7 +67,7 @@ npm ci && python3 -m pip install -r requirements.txt
 ```bash
 git clone https://github.com/ai-freer/fortune-skill.git ~/.codex/skills/fortune
 cd ~/.codex/skills/fortune
-npm ci && python3 -m pip install -r requirements.txt
+npm ci && python3 scripts/install-python.py
 ```
 
 **触发**：与 Claude Code 同。
@@ -77,7 +77,7 @@ npm ci && python3 -m pip install -r requirements.txt
 ```bash
 git clone https://github.com/ai-freer/fortune-skill.git ~/.cursor/skills/fortune
 cd ~/.cursor/skills/fortune
-npm ci && python3 -m pip install -r requirements.txt
+npm ci && python3 scripts/install-python.py
 ```
 
 **触发**：在 Cursor agent 对话中提到触发词即可。
@@ -87,7 +87,7 @@ npm ci && python3 -m pip install -r requirements.txt
 ```bash
 git clone https://github.com/ai-freer/fortune-skill.git ~/.trae/skills/fortune
 cd ~/.trae/skills/fortune
-npm ci && python3 -m pip install -r requirements.txt
+npm ci && python3 scripts/install-python.py
 ```
 
 ### OpenClaw / 通用 agent / 其他平台
@@ -97,7 +97,7 @@ OpenClaw 等使用 exec / shell tool 的 agent 不依赖固定 skill 目录。cl
 ```bash
 git clone https://github.com/ai-freer/fortune-skill.git
 cd fortune-skill
-npm ci && python3 -m pip install -r requirements.txt
+npm ci && python3 scripts/install-python.py
 ```
 
 然后告诉 agent：
@@ -118,7 +118,7 @@ cd ~/projects/fortune-skill
 ./install.sh    # 自动 detect 已安装的平台并 symlink
 ```
 
-`install.sh` 会把 `~/projects/fortune-skill` symlink 到所有检测到的 agent skill 目录，更新依赖只需在原位置 `git pull && npm ci` 一次。
+`install.sh` 会把 `~/projects/fortune-skill` symlink 到所有检测到的 agent skill 目录，更新依赖只需在原位置 `git pull && npm ci && python3 scripts/install-python.py` 一次。
 
 ---
 
@@ -128,7 +128,7 @@ cd ~/projects/fortune-skill
 
 ```bash
 npm run verify
-# expected: verified 26 checks
+# expected: verified <当前检查数> checks
 ```
 
 或单独跑某个排盘脚本：
@@ -168,7 +168,7 @@ stdout 应输出结构化 JSON，stderr 是日志。如果 stdout 解析失败�
 cd <仓库本地路径>
 git pull
 npm ci   # 如果 package.json 有变化
-python3 -m pip install -r requirements.txt --upgrade
+python3 scripts/install-python.py
 npm run verify
 ```
 
@@ -198,7 +198,7 @@ rm -rf ~/.claude/skills/fortune   # 或对应平台路径
 ```bash
 cd <仓库路径>
 rm -rf node_modules
-python3 -m pip uninstall lunar-python colorama bidict -y
+rm -rf .venv    # 仅删除本项目环境，不卸载全局包
 ```
 
 ---
@@ -218,7 +218,7 @@ python3 -m pip uninstall lunar-python colorama bidict -y
 ### Q3：`ModuleNotFoundError: No module named 'lunar_python'`
 
 - **原因**：Python 依赖未装
-- **修法**：`python3 -m pip install -r requirements.txt`，或用虚拟环境（venv）后再装
+- **修法**：`python3 scripts/install-python.py`，然后检查是否设置了指向其他环境的 `PYTHON`
 
 ### Q4：城市出生地"无法识别"
 
@@ -227,7 +227,7 @@ python3 -m pip uninstall lunar-python colorama bidict -y
 
 ### Q5：Windows 原生（非 WSL）能用吗？
 
-- 可以，但 `install.sh` 不能直接跑。手动 `npm ci + pip install`，然后把仓库 clone 到 `%USERPROFILE%\.claude\skills\fortune` 等对应路径
+- 可以，但 `install.sh` 不能直接跑。手动运行 `npm ci` 和 `python scripts/install-python.py`，然后把仓库 clone 到 `%USERPROFILE%\.claude\skills\fortune` 等对应路径
 - **强烈推荐用 WSL2**，与 macOS / Linux 行为一致
 
 ### Q6：怎么确认我的 Claude Code / Codex 真的加载了 skill？
@@ -253,3 +253,17 @@ ls -la ~/.claude/skills/fortune/SKILL.md   # 应能 cat 出 frontmatter
 
 PolyForm Noncommercial License 1.0.0，仅限非商用使用。详见 [LICENSE](./LICENSE)。
 第三方依赖与 vendored 代码各自保留原协议，详见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+
+## 项目 Python 环境与哈希校验
+
+运行 `python3 scripts/install-python.py`，不必激活 `.venv`。Windows PowerShell 使用 `python scripts/install-python.py`，其他 Node 命令相同。原有 `python3 scripts/bazi-classic.py ...` 会在导入依赖前切换到项目环境；显式 `PYTHON` 覆盖优先，且不因覆盖无效而偷偷回退。
+
+升级后重新运行安装器。移动仓库或基础 Python 升级可能使 venv 失效，先将 `.venv` 移到备份位置，再重建；不要删除自己的其他环境。旧全局包不会自动卸载。需要自管环境时仍可用 `python -m pip install --require-hashes -r requirements.txt`，但该方式不会验证已经满足的已安装包，也不会统一解释器，需自行设置 `PYTHON`。
+
+运行依赖清单、源码构建工具风险、漏洞检查范围见 [Python 安装与供应链边界](references/python-supply-chain.md)。
+
+### 继续使用现有解释器
+
+专用环境不是强制迁移要求，也不是安全沙箱。若全局依赖已满足要求，可保留原用法；明确设置 `PYTHON` 后，运行调用不会改用项目环境。需要按哈希重装到该解释器时，用 `python3 scripts/install-python.py --environment current`；用户级安装另加 `--user`。需把 `PYTHON` 保留在 Agent 启动环境中，安装器不自动修改 shell 配置。默认新安装选项目环境；若已设置 `PYTHON`，默认尊重该显式选择。详见供应链说明中的平台命令。
+
+维护者升级依赖前，请按 [依赖维护清单](references/python-supply-chain.md#dependency-maintenance) 核验制品并更新锁文件；普通用户按本页“升级”步骤更新即可。

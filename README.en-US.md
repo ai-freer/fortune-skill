@@ -196,7 +196,7 @@ Automatically installs dependencies, detects the local agent platform (Claude Co
 
 ```bash
 npm ci
-python3 -m pip install -r requirements.txt
+python3 scripts/install-python.py
 npm run verify        # Full verification; see output for the current check count
 ```
 
@@ -485,3 +485,11 @@ node scripts/daily-context.mjs --date "2026-07-05" --hour 12 --minute 0 --locati
 ```
 
 The query location is not automatically the birthplace. Resolve “today” in that location first; date, hour, and city are required, with minute defaulting to 0. Output represents only the reference instant: solar midnight or a solar-term transition can change the pillars within one civil day. Fixed timezone data, equation-of-time approximation, and boundary rejection rules are reused; failures do not fall back to raw time. This endpoint provides neither personal scores nor Ziwei daily transits for a specified date. Personalized interpretation still requires the natal chart; see `SKILL.md` for the full workflow.
+
+## Python Installation Hardening
+
+Without a `PYTHON` override, `python3 scripts/install-python.py` creates/reuses the project `.venv` and installs runtime artifacts with pinned SHA-256 hashes, without activation or changes to global packages. Node and direct classic-script calls prefer an explicit `PYTHON` override, then the project environment, then the legacy system interpreter. Source-build tools are not hash-locked: this is not complete supply-chain verification. See [installation and supply-chain limits](references/python-supply-chain.md) (Chinese). `python3 scripts/python-audit.py` checks published PyPI advisories for the three runtime pins; exit codes distinguish no known advisories (0), known advisories (1), and incomplete coverage (2). A separate advisory workflow reports failures without making the functional test workflow depend on database availability.
+
+Existing global installations remain supported. New installs default to the project environment; an explicit `PYTHON` takes priority. Use `--environment current` to hash-verify installation into the chosen interpreter, optionally `--user` for its user site. Keep `PYTHON` in the Agent environment: the installer does not rewrite shell configuration or persist runtime preferences. A venv isolates dependencies, not filesystem or network privileges.
+
+For dependency upgrades and user updates, see the [maintenance checklist](references/python-supply-chain.md#english).

@@ -49,8 +49,9 @@ need_cmd() {
 
 need_cmd node
 need_cmd npm
-need_cmd python3
-if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
+FORTUNE_PYTHON_BOOTSTRAP="${PYTHON:-python3}"
+need_cmd "$FORTUNE_PYTHON_BOOTSTRAP"
+if ! "$FORTUNE_PYTHON_BOOTSTRAP" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
   err "Python 版本过低，需要 ≥ 3.9（zoneinfo）。"
   exit 1
 fi
@@ -77,8 +78,7 @@ fi
 # ─── Step 2: Python 依赖 ───────────────────────────────────
 step "安装 Python 依赖"
 if [ -f "$SKILL_DIR/requirements.txt" ]; then
-  python3 -m pip install -r "$SKILL_DIR/requirements.txt" --quiet --user 2>/dev/null \
-    || python3 -m pip install -r "$SKILL_DIR/requirements.txt" --quiet
+  "$FORTUNE_PYTHON_BOOTSTRAP" "$SKILL_DIR/scripts/install-python.py"
   ok "Python 依赖已安装"
 else
   warn "未找到 requirements.txt，跳过"
@@ -157,7 +157,7 @@ cat <<'NEXT'
    1. 重启你的 agent（Claude Code / Codex / Cursor / Trae）以加载 skill
    2. 在对话中说 "算八字"、"看紫微"、"今年运势"、"合婚" 等触发词即可
 
-🔧 升级：cd <本仓库> && git pull && npm ci && npm run verify
+🔧 升级：cd <本仓库> && git pull && npm ci && python3 scripts/install-python.py && npm run verify
 🗑️  卸载：删除 ~/.claude/skills/fortune 等 symlink 即可
 
 文档：INSTALL.md / README.md / SKILL.md

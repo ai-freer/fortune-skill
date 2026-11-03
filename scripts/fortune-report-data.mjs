@@ -9,6 +9,7 @@
  * 输出: JSON 到 stdout。用于长期流年、逐月报告、贵人线索等报告写作前的数据准备。
  */
 
+import { pythonExecutable } from './python-runtime.mjs';
 import { parseInteger } from './cli-input.mjs';
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
@@ -23,7 +24,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const root = join(__dirname, '..');
 const node = process.execPath;
-const python = process.env.PYTHON || 'python3';
+const python = pythonExecutable();
 
 function parseArgs() {
   const args = process.argv.slice(2);

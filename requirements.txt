@@ -1,3 +1,5 @@
-lunar-python==1.4.8
-colorama==0.4.6
-bidict==0.23.1
+# Reviewed PyPI release artifacts; see references/python-supply-chain.md.
+--require-hashes
+lunar-python==1.4.8 --hash=sha256:3aa11cc73c25e70ddf0ba5bdac7398c03acc9491a3aa512a91c9642973b669d6
+colorama==0.4.6 --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
+bidict==0.23.1 --hash=sha256:5dae8d4d79b552a71cbabc7deb25dfe8ce710b17ff41711e13010ead2abfc3e5

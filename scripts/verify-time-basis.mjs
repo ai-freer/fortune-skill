@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pythonExecutable } from './python-runtime.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -13,8 +14,8 @@ import { calendarBasis } from './calendar-basis.mjs';
 import { solarTermBoundaryInfo } from './solar-term-boundary.mjs';
 const { Solar } = createRequire(import.meta.url)('lunar-javascript');
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const python = process.env.PYTHON || 'python3';
-const env = { ...process.env, NODE: process.execPath };
+const python = pythonExecutable();
+const env = { ...process.env, NODE: process.execPath, PYTHON: python };
 let count = 0;
 function check(name, fn) { fn(); count++; console.log(`ok - ${name}`); }
 function run(script, args, code = 0, options = {}) {

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Exercise real copies: symlinked scripts would resolve back to the original path.
+import { pythonExecutable } from './python-runtime.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
@@ -31,7 +32,7 @@ const entries = [
 ];
 
 function run(cwd, args) {
-  const result = spawnSync(process.execPath, args, { cwd, env: { ...process.env, NODE: process.execPath }, encoding: 'utf8', maxBuffer: 80 * 1024 * 1024, timeout: 120000 });
+  const result = spawnSync(process.execPath, args, { cwd, env: { ...process.env, NODE: process.execPath, PYTHON: pythonExecutable() }, encoding: 'utf8', maxBuffer: 80 * 1024 * 1024, timeout: 120000 });
   assert.ifError(result.error);
   assert.equal(result.status, 0, `${args[0]}: ${result.stdout}\n${result.stderr}`);
   return result;
