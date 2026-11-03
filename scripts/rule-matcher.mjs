@@ -7,6 +7,7 @@
  *   --gender <male|female> --birthplace "城市名" [--from 2026] [--to 2035] [--ziwei-years 2026,2027]
  */
 
+import { isMain } from './cli-entrypoint.mjs';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -440,10 +441,10 @@ function main() {
   if (result.status !== 0) {
     process.stdout.write(result.stdout || '');
     process.stderr.write(result.stderr || '');
-    process.exit(result.status);
+    process.exit(result.status ?? 1);
   }
   const data = JSON.parse(result.stdout);
   process.stdout.write(JSON.stringify(matchClassicalRules(data), null, 2) + '\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (isMain(import.meta.url)) main();

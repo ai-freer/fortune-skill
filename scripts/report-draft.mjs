@@ -7,6 +7,7 @@
  *   --gender <male|female> --birthplace "城市名" [--from 2026] [--to 2035] [--ziwei-years 2026,2027]
  */
 
+import { parseInteger } from './cli-input.mjs';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -19,17 +20,17 @@ const node = process.execPath;
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opts = { type: 'long_year_month', minute: 0, from: new Date().getFullYear(), to: new Date().getFullYear() + 9 };
+  const opts = { type: 'long_year_month', minute: 0, from: new Date(Date.now() + 8 * 3600000).getUTCFullYear(), to: new Date(Date.now() + 8 * 3600000).getUTCFullYear() + 9 };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--type' && args[i + 1]) opts.type = args[++i];
     else if (args[i] === '--solar' && args[i + 1]) opts.solar = args[++i];
-    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInt(args[++i], 10);
-    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInt(args[++i], 10);
+    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInteger(args[++i]);
+    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInteger(args[++i]);
     else if (args[i] === '--gender' && args[i + 1]) opts.gender = args[++i];
     else if (args[i] === '--birthplace' && args[i + 1]) opts.birthplace = args[++i];
     else if (args[i] === '--calibration-file' && args[i + 1]) opts.calibrationFile = args[++i];
-    else if (args[i] === '--from' && args[i + 1]) opts.from = parseInt(args[++i], 10);
-    else if (args[i] === '--to' && args[i + 1]) opts.to = parseInt(args[++i], 10);
+    else if (args[i] === '--from' && args[i + 1]) opts.from = parseInteger(args[++i]);
+    else if (args[i] === '--to' && args[i + 1]) opts.to = parseInteger(args[++i]);
     else if (args[i] === '--ziwei-years' && args[i + 1]) opts.ziweiYears = args[++i];
   }
   return opts;
@@ -409,6 +410,9 @@ function renderCommonOpening(data, template, title) {
     '> 本草稿由脚本生成，供 LLM 进一步解释、取舍和润色；不应直接作为最终报告。',
     '',
     '## 1. 输入与时辰',
+    '',
+    ...(data.base.timeCorrection?.precisionGuard?.historicalTimezoneAssumption ? ['- 历史时区待核实：以下结果以城市代表时区规则为条件，不能视为唯一确定的历史命盘。'] : []),
+    '- 时间基准：地方视太阳时近似，已加入 NOAA 均时差近似；不提供秒级天文精度保证。年月柱/交节与大运另按出生 UTC 瞬时的北京时间参考计算；日时柱与紫微按太阳钟规则。',
     '',
     `- 出生信息：${data.input.solar} ${data.input.hour}:${String(data.input.minute).padStart(2, '0')}，${data.input.birthplace}，${data.input.gender}`,
     `- 排盘四柱：${Object.values(data.base.pillars || {}).map(p => p.ganZhi).join(' ')}`,

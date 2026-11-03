@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 /**
- * time-normalize.mjs — 时间校正脚本（夏令时 + 真太阳时）
+ * time-normalize.mjs — 时间校正脚本（夏令时 + 地方平太阳时）
  *
  * 用法: node time-normalize.mjs --solar "YYYY-MM-DD" --hour <0-23> [--minute <0-59>] --birthplace "城市名"
  * 输出: JSON 到 stdout，日志到 stderr
  *
  * 校正流程:
  *   1. 出生地 → 时区 + 经度
- *   2. 夏令时检测（IANA tz database via Intl API）
- *   3. 真太阳时校正（经度差 × 4 分钟/度）
+ *   2. 民用时间解析（固定版本 IANA TZif + Python 标准库）
+ *   3. 太阳时近似（UTC + 东经 × 4 分钟/度 + NOAA 均时差）
  *   4. 校正后时间 → 时辰
  */
 
-import { findCity, TZ_STANDARD_LONGITUDE } from './city-data.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { solarClock, clockParts } from './solar-clock.mjs';
+import { isMain } from './cli-entrypoint.mjs';
+import { parseInteger } from './cli-input.mjs';
+import { findCity } from './city-data.mjs';
 import { solarTermBoundaryInfo } from './solar-term-boundary.mjs';
 
 // ─── 参数解析 ───────────────────────────────────────────────
@@ -21,8 +26,8 @@ function parseArgs() {
   const opts = { minute: 0 };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--solar' && args[i + 1]) opts.solar = args[++i];
-    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInt(args[++i], 10);
-    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInt(args[++i], 10);
+    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInteger(args[++i]);
+    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInteger(args[++i]);
     else if (args[i] === '--birthplace' && args[i + 1]) opts.birthplace = args[++i];
   }
   return opts;
@@ -52,7 +57,8 @@ function parseSolarDate(dateStr) {
 }
 
 // ─── DST 检测 ───────────────────────────────────────────────
-// 利用 Intl.DateTimeFormat 的 resolvedOptions 和 UTC offset 差异来检测 DST
+// Legacy Intl formatting helpers retained for import compatibility only.
+// Chart normalization below uses the pinned TZif resolver, never these helpers.
 export function normalizeIntlDateTimeParts(parts) {
   const value = type => parts.find(p => p.type === type)?.value;
   const localYear = parseInt(value('year'), 10);
@@ -60,6 +66,7 @@ export function normalizeIntlDateTimeParts(parts) {
   const localDay = parseInt(value('day'), 10);
   const rawHour = parseInt(value('hour'), 10);
   const localMinute = parseInt(value('minute'), 10);
+  const localSecond = Number(value('second') || 0);
 
   return {
     localYear,
@@ -67,6 +74,7 @@ export function normalizeIntlDateTimeParts(parts) {
     localDay,
     localHour: rawHour === 24 ? 0 : rawHour,
     localMinute,
+    localSecond,
     hourWas24: rawHour === 24
   };
 }
@@ -88,7 +96,7 @@ export function getUTCOffsetParts(y, m, d, h, minute, timezone) {
     normalized.localDay,
     normalized.localHour,
     normalized.localMinute,
-    0
+    normalized.localSecond
   ));
   const diffMs = localDate.getTime() - utcDate.getTime();
   return {
@@ -102,52 +110,30 @@ export function getUTCOffset(y, m, d, h, minute, timezone) {
 }
 
 export function detectDST(dateStr, hour, minute, timezone) {
-  const { year, month, day } = parseSolarDate(dateStr);
-
-  // 获取该日期的 offset
-  const targetOffset = getUTCOffset(year, month, day, hour, minute, timezone);
-
-  // 获取 1 月和 7 月的 offset 来确定标准时间 offset
-  const janOffset = getUTCOffset(year, 1, 15, 12, 0, timezone);
-  const julOffset = getUTCOffset(year, 7, 15, 12, 0, timezone);
-
-  // 标准时间 offset 是较小的那个（北半球 1 月是标准时间，南半球 7 月是标准时间）
-  const standardOffset = Math.min(janOffset, julOffset);
-  const dstOffset = Math.max(janOffset, julOffset);
-
-  const isDST = targetOffset > standardOffset;
-  const dstShift = isDST ? (targetOffset - standardOffset) : 0;
-
-  // 生成说明
-  let note = '';
-  if (isDST) {
-    // 中国特殊说明
-    if (timezone === 'Asia/Shanghai' && year >= 1986 && year <= 1991) {
-      note = `中国 1986-1991 夏令时（4月中旬-9月中旬，+1h）`;
-    } else if (timezone.startsWith('America/')) {
-      note = `美国夏令时 (DST +${dstShift / 60}h)`;
-    } else if (timezone.startsWith('Europe/')) {
-      note = `欧洲夏令时 (DST +${dstShift / 60}h)`;
-    } else if (timezone.startsWith('Australia/')) {
-      note = `澳洲夏令时 (DST +${dstShift / 60}h)`;
-    } else {
-      note = `夏令时 (DST +${dstShift / 60}h)`;
-    }
+  const result = spawnSync(process.env.PYTHON || 'python3',
+    [fileURLToPath(new URL('./timezone-resolve.py', import.meta.url)), dateStr,
+      String(hour), String(minute), timezone], { encoding: 'utf8', timeout: 10000 });
+  let data;
+  try { data = JSON.parse(result.stdout || '{}'); } catch { data = {}; }
+  if (result.status !== 0 || data.error || !data.utcInstant) {
+    const error = new Error(data.error === 'ambiguous_local_time'
+      ? `当地钟表时间重复，须核实对应 UTC 瞬时：${(data.candidates || []).join(', ')}`
+      : data.error === 'nonexistent_local_time' ? '当地钟表时间不存在，请核实输入'
+      : '固定时区数据解析失败，请检查 Python 3.9+ 和数据完整性');
+    error.code = data.error || 'timezone_error';
+    throw error;
   }
-
-  return {
-    active: isDST,
-    offset: isDST ? dstShift / 60 : 0, // hours
-    offsetMinutes: dstShift, // minutes
-    standardOffsetMinutes: standardOffset,
-    note
-  };
+  return { active: data.dstSeconds !== 0, offset: data.dstSeconds / 3600,
+    offsetMinutes: data.dstSeconds / 60, standardOffsetMinutes: data.standardOffsetSeconds / 60,
+    utcOffsetMinutes: data.offsetSeconds / 60, utcInstant: data.utcInstant,
+    tzdbVersion: data.tzdbVersion, tzifSha256: data.tzifSha256,
+    note: `IANA ${data.tzdbVersion}; DST ${data.dstSeconds} seconds` };
 }
 
-// ─── 真太阳时校正 ───────────────────────────────────────────
-function calcTrueSolarTimeCorrection(longitude, timezone) {
-  const stdLon = TZ_STANDARD_LONGITUDE[timezone];
-  if (stdLon === undefined) return null;
+// ─── 地方平太阳时校正 ───────────────────────────────────────────
+function calcLocalMeanSolarTimeCorrection(longitude, standardOffsetMinutes) {
+  // The historical offset comes from IANA, rather than today's fixed meridian.
+  const stdLon = standardOffsetMinutes / 4;
 
   const diff = longitude - stdLon; // 正 = 偏东，负 = 偏西
   const correctionMinutes = diff * 4; // 每度 4 分钟
@@ -196,48 +182,6 @@ function shichenBoundaryInfo(hour, minute) {
   };
 }
 
-// ─── 应用校正 ───────────────────────────────────────────────
-function applyCorrections(dateStr, hour, minute, dstResult, solarTimeResult) {
-  let totalMinutes = hour * 60 + minute;
-  const { year, month, day } = parseSolarDate(dateStr);
-
-  // 1. 减去 DST 偏移（DST 时钟拨快了，要减回去）
-  if (dstResult.active) {
-    totalMinutes -= dstResult.offsetMinutes;
-  }
-
-  // 2. 加上真太阳时校正
-  if (solarTimeResult) {
-    totalMinutes += solarTimeResult.correctionMinutes;
-  }
-
-  totalMinutes = Math.round(totalMinutes);
-
-  // 处理跨日
-  let correctedDate = new Date(year, month - 1, day);
-  if (totalMinutes < 0) {
-    // 前一天
-    correctedDate.setDate(correctedDate.getDate() - 1);
-    totalMinutes += 24 * 60;
-  } else if (totalMinutes >= 24 * 60) {
-    // 后一天
-    correctedDate.setDate(correctedDate.getDate() + 1);
-    totalMinutes -= 24 * 60;
-  }
-
-  const correctedHour = Math.floor(totalMinutes / 60);
-  const correctedMinute = totalMinutes % 60;
-
-  const correctedSolar = `${correctedDate.getFullYear()}-${String(correctedDate.getMonth() + 1).padStart(2, '0')}-${String(correctedDate.getDate()).padStart(2, '0')}`;
-
-  return {
-    solar: correctedSolar,
-    hour: correctedHour,
-    minute: correctedMinute,
-    shichen: hourToShichen(correctedHour)
-  };
-}
-
 // ─── 主逻辑 ─────────────────────────────────────────────────
 function main() {
   const opts = parseArgs();
@@ -256,44 +200,48 @@ function main() {
   const city = findCity(opts.birthplace);
   const warnings = [];
 
-  // 确定时区
-  let timezone;
-  let longitude = null;
-
-  if (city) {
-    timezone = city.timezone;
-    longitude = city.longitude;
-  } else {
-    // 城市不在表中：假设中国城市用 Asia/Shanghai，跳过真太阳时
-    // 检查是否可能是中国城市（包含中文字符）
-    const hasChinese = /[\u4e00-\u9fff]/.test(opts.birthplace);
-    if (hasChinese) {
-      timezone = 'Asia/Shanghai';
-      warnings.push(`城市"${opts.birthplace}"不在内置城市表中，默认使用 Asia/Shanghai 时区，跳过真太阳时校正`);
-    } else {
-      fail('unknown_city', `城市"${opts.birthplace}"不在内置城市表中，无法确定时区。请使用主要城市名称。`, opts);
-    }
+  if (!city) {
+    fail('unknown_city', `城市"${opts.birthplace}"不在内置城市表中，无法确定出生地时区和经度。请提供可识别的城市名称。`, opts);
   }
+  const { timezone, longitude } = city;
 
   // DST 检测
-  const dst = detectDST(opts.solar, opts.hour, opts.minute, timezone);
-
-  // 真太阳时校正
-  let trueSolarTime = null;
-  if (longitude !== null) {
-    trueSolarTime = calcTrueSolarTimeCorrection(longitude, timezone);
-    if (!trueSolarTime) {
-      warnings.push(`时区 ${timezone} 的标准经度未配置，跳过真太阳时校正`);
-    }
+  let dst;
+  try {
+    dst = detectDST(opts.solar, opts.hour, opts.minute, timezone);
+  } catch (error) {
+    fail(error.code || 'timezone_error', error.message, opts);
   }
 
-  // 应用校正
-  const corrected = applyCorrections(opts.solar, opts.hour, opts.minute, dst, trueSolarTime);
-  const solarTermBoundary = solarTermBoundaryInfo(corrected.solar, corrected.hour, corrected.minute);
+  // Keep the historical JSON key; the method is explicitly local mean solar time.
+  const trueSolarTime = calcLocalMeanSolarTimeCorrection(longitude, dst.standardOffsetMinutes);
+
+  // One physical instant drives both clocks. Never round across a boundary.
+  let solar;
+  try { solar = solarClock(dst.utcInstant, longitude); }
+  catch (error) { fail('unsupported_solar_time', error.message, opts); }
+  const corrected = { ...solar.apparent, shichen: hourToShichen(solar.apparent.hour) };
+  const beijing = clockParts(new Date(dst.utcInstant).getTime() + 8 * 3600000);
+  const solarTermBoundary = solarTermBoundaryInfo(beijing.solar, beijing.hour, beijing.minute, 30, beijing.second);
+  solarTermBoundary.timeBasis = 'UTC+08:00';
+  solarTermBoundary.calendarBoundaryConflict = false;
+  warnings.push(solar.precision);
+  if (Number(opts.solar.slice(0, 4)) < 1970) warnings.push('1970 年以前 IANA 记录覆盖不完整；本结果以城市代表时区规则为条件计算，需核实出生地点当时实际钟表制度，不是唯一确定的历史命盘。');
   if (solarTermBoundary.near && solarTermBoundary.nearest) {
     warnings.push(`接近节气${solarTermBoundary.nearest.name}，相差约 ${solarTermBoundary.nearest.absDiffMinutes} 分钟，月令/月柱需保守复核`);
   }
 
+  const dayMinute = corrected.hour * 60 + corrected.minute + corrected.second / 60;
+  const boundary = shichenBoundaryInfo(corrected.hour, corrected.minute + corrected.second / 60);
+  const clockBoundaryDistance = Math.min(boundary.minutesSincePreviousBoundary,
+    boundary.minutesToNextBoundary, dayMinute, 1440 - dayMinute);
+  const precisionGuard = {
+    marginMinutes: 2,
+    historicalTimezoneAssumption: Number(opts.solar.slice(0, 4)) < 1970,
+    reason: clockBoundaryDistance <= 2 ? 'approximate_solar_clock_boundary'
+      : solarTermBoundary.nearest?.absDiffMinutes <= 2 ? 'solar_term_precision_boundary' : null,
+    note: '2 分钟是项目保守拒绝窗口，并非 NOAA 算法或节气库的已证明误差界；窗口外仍须保留近似说明。'
+  };
   // 原始时辰
   const originalShichen = hourToShichen(opts.hour);
 
@@ -307,22 +255,37 @@ function main() {
     },
     city: city ? { name: city.name, province: city.province || null } : null,
     timezone,
+    instant: { utc: dst.utcInstant, tzdbVersion: dst.tzdbVersion, tzifSha256: dst.tzifSha256 },
+    calendarReference: beijing,
+    calendarPolicy: {
+      version: 'utc-instant-v1', yearMonth: 'actual instant, solar terms in UTC+08:00',
+      dayTime: 'local apparent solar clock; EightChar sect=2, midnight day; late-Zi hour stem uses following day',
+      dayun: 'actual instant in UTC+08:00; library sect=1 traditional shichen discretization',
+      ziwei: 'local apparent calendar date and shichen; iztro normal year, forward late-Zi'
+    },
     dst: {
       active: dst.active,
       offset: dst.offset,
-      note: dst.note
+      note: dst.note,
+      utcOffsetMinutes: dst.utcOffsetMinutes
     },
     trueSolarTime: trueSolarTime ? {
+      method: 'local_apparent_solar_time_approximation',
+      equationOfTimeApplied: true,
+      equationOfTime: solar,
       longitude: trueSolarTime.longitude,
       standardLongitude: trueSolarTime.standardLongitude,
-      correction: trueSolarTime.correction
+      correction: trueSolarTime.correction,
+      correctionMeaning: 'legacy longitude-only correction relative to standard meridian; excludes DST and equation of time',
+      totalCorrectionMinutes: longitude * 4 - dst.utcOffsetMinutes + solar.equationOfTimeMinutes
     } : null,
     corrected,
     boundary: {
       original: shichenBoundaryInfo(opts.hour, opts.minute),
-      corrected: shichenBoundaryInfo(corrected.hour, corrected.minute)
+      corrected: shichenBoundaryInfo(corrected.hour, corrected.minute + corrected.second / 60)
     },
     solarTermBoundary,
+    precisionGuard,
     original: {
       hour: opts.hour,
       minute: opts.minute,
@@ -335,6 +298,6 @@ function main() {
   process.stdout.write(JSON.stringify(output, null, 2) + '\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   main();
 }

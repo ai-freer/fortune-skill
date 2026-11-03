@@ -20,7 +20,7 @@ This file is an engineering notice, not legal advice.
 
 | Component | Source | License / Rights Status | Local Path | Notes |
 |-----------|--------|-------------------------|------------|-------|
-| china-testing/bazi | https://github.com/china-testing/bazi | No declared license found in the vendored copy during local review | `vendor/bazi/` | Kept in git intentionally for personal, research, and noncommercial use. Because the upstream copy does not declare a license, this repository does not sublicense that code or its bundled texts beyond any rights that actually apply. Downstream users should review the upstream project and obtain permissions if needed before reuse, redistribution, or commercial use. |
+| china-testing/bazi | https://github.com/china-testing/bazi | No license file bundled; redistribution status confirmed by maintainer | `vendor/bazi/` | On 2026-11-03 the maintainer confirmed that upstream redistribution permissions had previously been resolved. This review did not independently inspect permission documents. The code and bundled texts retain their own rights; this repository does not grant additional rights beyond the applicable permissions. |
 
 ## Referenced Projects And Materials
 
@@ -33,7 +33,12 @@ This file is an engineering notice, not legal advice.
 - The project-level PolyForm Noncommercial license applies only to this
   repository's original work unless a file says otherwise.
 - Third-party packages retain their own license terms.
-- `vendor/bazi/` is the main publication risk: it is source-available upstream
-  but has no declared license in the local copy. It remains tracked because the
-  project owner accepts this noncommercial-use risk.
+- `vendor/bazi/` remains included based on the maintainer confirmation recorded
+  above, not on an assumption that public availability or noncommercial use
+  alone grants redistribution rights. No permission document was independently
+  verified in this review.
 - Generated reports are local/private outputs and are ignored by git.
+
+## Bundled timezone data
+
+`data/tzdb/` contains public-domain IANA-derived timezone data copied from the already installed macOS 2026f.1.0 distribution (2026f-rearguard). It is not covered by the project's noncommercial restriction. See `data/tzdb/NOTICE.md` and its manifest for provenance, hashes, coverage, limitations, and https://data.iana.org/time-zones/tzdb/LICENSE for the upstream data status. Hashes establish local integrity, not independent authentication of the distributor or upstream release.

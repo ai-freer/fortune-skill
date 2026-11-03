@@ -1,5 +1,8 @@
 name: Verify
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -54,8 +57,8 @@ jobs:
       - name: Run verify suite
         run: npm run verify
 
-      - name: Run privacy-check (no-git mode)
-        run: node scripts/privacy-check.mjs --no-git
+      - name: Scan tracked source for private paths and secret shapes
+        run: node scripts/privacy-check.mjs --tracked
 
   shellcheck:
     name: Shellcheck install.sh
@@ -67,7 +70,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@00b27aa7cb85167568cb48a3838b75f4265f2bca
         with:
           scandir: '.'
           severity: warning

@@ -5,7 +5,7 @@
  * 海外：80+ 主要城市（中英文双条目）
  *
  * 格式: { name, timezone, longitude, province? }
- * - 中国城市统一 Asia/Shanghai（北京时间），经度差异通过真太阳时校正
+ * - 中国城市统一 Asia/Shanghai（北京时间），经度差异通过地方平太阳时校正
  * - 海外城市使用各自 IANA 时区
  */
 
@@ -732,7 +732,7 @@ export const CITY_DB = [
 ];
 
 const CITY_ALIAS_TO_PREFECTURE = {
-  // 安徽省马鞍山市下辖县区。县区经度与马鞍山市区接近，优先使用地级市经度做真太阳时校正。
+  // 安徽省马鞍山市下辖县区。县区经度与马鞍山市区接近，优先使用地级市经度做地方平太阳时校正。
   '当涂': '马鞍山',
   '当涂县': '马鞍山',
   '含山': '马鞍山',
@@ -771,6 +771,8 @@ export function findCity(name) {
 
   const normalized = normalizePlaceName(name);
 
+  if (!normalized) return null;
+
   const exact = CITY_DB.find(c => c.name === name || c.name === normalized);
   if (exact) return exact;
 
@@ -790,6 +792,7 @@ export function findCity(name) {
 }
 
 // ─── 时区标准经度映射 ───────────────────────────────────────
+// Legacy contemporary display values only; normalization derives historical meridians from IANA.
 // UTC offset (hours) × 15 = standard longitude
 // 某些时区的标准经度不是简单的 offset × 15，需要特殊处理
 export const TZ_STANDARD_LONGITUDE = {
@@ -823,8 +826,8 @@ export const TZ_STANDARD_LONGITUDE = {
   'Asia/Dubai': 60,            // UTC+4 → 60°E
   'Asia/Riyadh': 45,           // UTC+3 → 45°E
   'Asia/Tehran': 52.5,         // UTC+3:30 → 52.5°E
-  'Asia/Jerusalem': 35.25,     // UTC+2 → 30°E (IST uses 35.25 effectively)
-  'Europe/Istanbul': 30,       // UTC+3 → 45°E (Turkey uses UTC+3 permanently)
+  'Asia/Jerusalem': 30,        // UTC+2 → 30°E
+  'Europe/Istanbul': 45,       // UTC+3 → 45°E; historical offsets vary
 
   // 欧洲
   'Europe/London': 0,          // UTC+0 → 0°

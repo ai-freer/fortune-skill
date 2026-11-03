@@ -7,6 +7,7 @@ bazi-classic.py — 三命通会 + 经典八字分析（基于 china-testing/baz
 输出: JSON 到 stdout，日志到 stderr
 """
 
+from calendar_basis import calendar_basis
 import sys
 import os
 import json
@@ -74,7 +75,7 @@ def normalize_time(solar_date, hour, minute, birthplace):
     script_path = os.path.join(script_dir, 'time-normalize.mjs')
     try:
         result = subprocess.run(
-            ['node', script_path, '--solar', solar_date, '--hour', str(hour),
+            [os.environ.get('NODE', 'node'), script_path, '--solar', solar_date, '--hour', str(hour),
              '--minute', str(minute), '--birthplace', birthplace],
             capture_output=True, text=True, timeout=10
         )
@@ -292,6 +293,8 @@ def main():
 
     # 时间校正
     time_norm = normalize_time(args.solar, args.hour, args.minute, args.birthplace)
+    if time_norm and time_norm.get('precisionGuard', {}).get('reason'):
+        fail(time_norm['precisionGuard']['reason'], '历史时区或近似算法边界不能可靠确定，停止精确排盘', args.solar)
     if time_norm and 'error' not in time_norm:
         use_solar = time_norm['corrected']['solar']
         use_hour = time_norm['corrected']['hour']
@@ -303,20 +306,18 @@ def main():
             "dst": time_norm['dst'],
             "trueSolarTime": time_norm['trueSolarTime'],
             "timezone": time_norm['timezone'],
+            "precisionGuard": time_norm['precisionGuard'],
+            "instant": time_norm['instant'],
+            "calendarReference": time_norm['calendarReference'],
+            "calendarPolicy": time_norm['calendarPolicy'],
             "shichenChanged": time_norm['shichenChanged'],
             "boundary": time_norm.get('boundary'),
+            "solarTermBoundary": time_norm.get('solarTermBoundary'),
             "warnings": time_norm.get('warnings', [])
         }
         print(f"[bazi-classic] 时间校正: {args.solar} {args.hour}:{args.minute:02d} → {use_solar} {use_hour}:{time_norm['corrected']['minute']:02d}", file=sys.stderr)
     else:
-        use_solar = args.solar
-        use_hour = args.hour
-        use_minute = args.minute
-        time_correction = {
-            "applied": False,
-            "note": time_norm.get('message', '时间校正脚本调用失败') if time_norm else '时间校正脚本调用失败'
-        }
-        print("[bazi-classic] 时间校正失败，使用原始时间", file=sys.stderr)
+        fail("time_normalization_failed", "时间校正失败，停止排盘；请检查出生地、当地时间和运行环境", args.solar)
 
     # 解析日期
     year, month, day = parse_solar_date(use_solar)
@@ -324,7 +325,7 @@ def main():
     try:
         solar = Solar.fromYmdHms(year, month, day, use_hour, use_minute, 0)
         lunar = solar.getLunar()
-        ba = lunar.getEightChar()
+        ba = calendar_basis(time_norm)
     except Exception as e:
         fail("calc_error", f"排盘计算失败: {e}", args.solar)
 

@@ -27,3 +27,10 @@ reports/
 
 # 开发过程文档与历史 audit 记录（本地保留，不公开）
 dev-archive/
+
+# 本地运行环境及工具记忆（保留本地，不提交）
+.venv/
+.remember/
+.playwright/
+.workbuddy/
+.wbapp_*.genie

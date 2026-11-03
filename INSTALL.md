@@ -28,7 +28,7 @@ cd fortune-skill
 | 要求 | 版本 |
 |---|---|
 | Node.js | ≥ 18（推荐 22+）|
-| Python  | ≥ 3.8 |
+| Python  | ≥ 3.9（时间解析使用标准库 zoneinfo） |
 | npm | 随 Node 自带 |
 | Git | clone 用 |
 

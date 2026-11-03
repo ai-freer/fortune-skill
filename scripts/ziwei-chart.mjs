@@ -8,6 +8,7 @@
  * --year <YYYY>: 流年快查模式，只输出该年的流年运势数据
  */
 
+import { parseInteger } from './cli-input.mjs';
 import { createRequire } from 'module';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -26,11 +27,11 @@ function parseArgs() {
   const opts = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--solar' && args[i + 1]) opts.solar = args[++i];
-    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInt(args[++i], 10);
-    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInt(args[++i], 10);
+    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInteger(args[++i]);
+    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInteger(args[++i]);
     else if (args[i] === '--gender' && args[i + 1]) opts.gender = args[++i];
     else if (args[i] === '--birthplace' && args[i + 1]) opts.birthplace = args[++i];
-    else if (args[i] === '--year' && args[i + 1]) opts.year = parseInt(args[++i], 10);
+    else if (args[i] === '--year' && args[i + 1]) opts.year = parseInteger(args[++i]);
     else if (args[i] === '--lang' && args[i + 1]) opts.lang = args[++i];
   }
   if (opts.minute === undefined) opts.minute = 0;
@@ -65,7 +66,7 @@ function normalizeTime(solar, hour, minute, birthplace) {
   try {
     const scriptPath = join(__dirname, 'time-normalize.mjs');
     const args = ['--solar', solar, '--hour', String(hour), '--minute', String(minute), '--birthplace', birthplace];
-    const result = execFileSync('node', [scriptPath, ...args], {
+    const result = execFileSync(process.execPath, [scriptPath, ...args], {
       encoding: 'utf8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe']
@@ -355,10 +356,12 @@ function main() {
     fail('invalid_gender', '--gender 必须为 male 或 female', JSON.stringify(opts));
   }
 
+  if (opts.year !== undefined && (!Number.isInteger(opts.year) || opts.year < 1 || opts.year > 9999)) fail('invalid_year', '--year 必须为 1-9999 的整数', opts);
   parseSolarDate(opts.solar);
 
   // ── 时间校正 ──
   const timeNorm = normalizeTime(opts.solar, opts.hour, opts.minute, opts.birthplace);
+  if (timeNorm?.precisionGuard?.reason) fail(timeNorm.precisionGuard.reason, '历史时区或近似算法边界不能可靠确定，停止精确排盘', timeNorm.precisionGuard);
   let useSolar, useHour, useMinute;
   let timeCorrection;
 
@@ -373,6 +376,10 @@ function main() {
       dst: timeNorm.dst,
       trueSolarTime: timeNorm.trueSolarTime,
       timezone: timeNorm.timezone,
+      precisionGuard: timeNorm.precisionGuard,
+      instant: timeNorm.instant,
+      calendarReference: timeNorm.calendarReference,
+      calendarPolicy: timeNorm.calendarPolicy,
       shichenChanged: timeNorm.shichenChanged,
       boundary: timeNorm.boundary || null,
       solarTermBoundary: timeNorm.solarTermBoundary || null,
@@ -380,14 +387,7 @@ function main() {
     };
     console.error(`[ziwei-chart] 时间校正: ${opts.solar} ${opts.hour}:${String(opts.minute).padStart(2,'0')} → ${useSolar} ${useHour}:${String(timeNorm.corrected.minute).padStart(2,'0')}`);
   } else {
-    useSolar = opts.solar;
-    useHour = opts.hour;
-    useMinute = opts.minute;
-    timeCorrection = {
-      applied: false,
-      note: timeNorm ? timeNorm.message : '时间校正脚本调用失败'
-    };
-    console.error('[ziwei-chart] 时间校正失败，使用原始时间');
+    fail('time_normalization_failed', '时间校正失败，停止排盘；请检查出生地、当地时间和运行环境', { solar: opts.solar, hour: opts.hour, minute: opts.minute, birthplace: opts.birthplace });
   }
 
   const { year, month, day } = parseSolarDate(useSolar);
@@ -398,9 +398,7 @@ function main() {
 
   let astrolabe;
   try {
-    if (opts.lang) {
-      iztro.astro.config({ language: opts.lang });
-    }
+    iztro.astro.config({ yearDivide: 'normal', horoscopeDivide: 'normal', ageDivide: 'normal', dayDivide: 'forward', ...(opts.lang ? { language: opts.lang } : {}) });
     astrolabe = iztro.astro.astrolabeBySolarDate(dateStr, shichenIndex, genderCN);
   } catch (e) {
     fail('calc_error', `紫微排盘计算失败: ${e.message}`, opts.solar);
@@ -428,7 +426,7 @@ function main() {
         yearly: h.yearly
       };
     } catch (e) {
-      console.error(`[ziwei-chart] 流年运限计算警告: ${e.message}`);
+      fail('unsupported_year', `流年运限计算失败: ${e.message}`, { targetYear });
     }
 
     // 命宫和身宫
@@ -507,9 +505,9 @@ function main() {
   } : null;
 
   // ── 运限 ──
-  const now = new Date();
-  const nowDateStr = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-  const nowShichen = hourToShichen(now.getHours(), now.getMinutes());
+  const now = new Date(Date.now() + 8 * 3600000);
+  const nowDateStr = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}`;
+  const nowShichen = hourToShichen(now.getUTCHours(), now.getUTCMinutes());
 
   let horoscope = null;
   try {

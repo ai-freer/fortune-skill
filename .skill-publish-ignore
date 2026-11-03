@@ -1,0 +1,14 @@
+reports/
+dev-archive/
+*.pdf
+*.docx
+*.xlsx
+.env
+.env.*
+.git/
+.venv/
+node_modules/
+.remember/
+.playwright/
+.workbuddy/
+.wbapp_*.genie

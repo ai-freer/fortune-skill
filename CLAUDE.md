@@ -41,7 +41,7 @@ python3 scripts/bazi-classic.py --solar "1990-05-15" --hour 15 --gender male --b
 
 ## 时间基准原则
 
-真太阳时为正式排盘基准。用户提供的标准时间只是原始输入，脚本会按出生地进行夏令时和真太阳时校正；未校正 Raw Time 不得作为正式命盘依据，也不得为了贴合外部 benchmark 或预计算命盘而回退使用。
+地方视太阳时近似为正式排盘基准。用户提供的出生地民用钟表时间只是原始输入，脚本会按出生地进行夏令时和地方视太阳时近似校正；未校正 Raw Time 不得作为正式命盘依据，也不得为了贴合外部 benchmark 或预计算命盘而回退使用。
 
 ## 修改指南
 
@@ -49,3 +49,7 @@ python3 scripts/bazi-classic.py --solar "1990-05-15" --hour 15 --gender male --b
 - 修改排盘逻辑 → 编辑 `scripts/` 下对应脚本
 - 补充命理知识 → 编辑 `references/` 下对应文件
 - 脚本接口：`--solar "YYYY-MM-DD" --hour <0-23> --gender <male|female> --birthplace "城市"`
+
+## 当前时间实现边界
+
+以唯一出生 UTC 瞬时计算不同规则所需的时钟；年月柱/交节、大运使用 UTC+08:00 参考，日时柱与紫微使用地方视太阳钟近似，不能统一替换为同一种日历标签。算法、固定时区版本、精度拒绝窗口及历史限制见 `references/time-basis.md`。

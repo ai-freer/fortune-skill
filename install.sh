@@ -50,10 +50,15 @@ need_cmd() {
 need_cmd node
 need_cmd npm
 need_cmd python3
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
+  err "Python 版本过低，需要 ≥ 3.9（zoneinfo）。"
+  exit 1
+fi
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
 if [ "$NODE_MAJOR" -lt 18 ]; then
-  warn "Node.js 版本过低（当前 $(node -v)），推荐 ≥ 18，最佳 22+。"
+  err "Node.js 版本过低（当前 $(node -v)），需要 ≥ 18。"
+  exit 1
 fi
 
 # ─── Step 1: Node.js 依赖 ──────────────────────────────────
@@ -106,7 +111,7 @@ for entry in "${AGENT_PLATFORMS[@]}"; do
       warn "$name: $target 已存在且不是 symlink，跳过（避免覆盖现有 skill）"
       SKIPPED+=("$name (existing non-symlink at $target)")
     else
-      ln -sf "$SKILL_DIR" "$target"
+      ln -sfn "$SKILL_DIR" "$target"
       LINKED+=("$name → $target")
     fi
   else
@@ -116,13 +121,16 @@ done
 
 # ─── Step 4: 验证 ──────────────────────────────────────────
 step "运行 verify 自检"
-if ( cd "$SKILL_DIR" && npm run verify --silent ) >/tmp/fortune-verify.log 2>&1; then
-  TOTAL=$(grep -c '^ok' /tmp/fortune-verify.log || echo "?")
+VERIFY_LOG="$(mktemp "${TMPDIR:-/tmp}/fortune-verify.XXXXXX")"
+if ( cd "$SKILL_DIR" && npm run verify --silent ) >"$VERIFY_LOG" 2>&1; then
+  TOTAL=$(awk '/^verified [0-9]+ checks$/ {n=$2} END {print n ? n : "?"}' "$VERIFY_LOG")
   ok "verify 通过（$TOTAL 项）"
+  rm -f "$VERIFY_LOG"
 else
-  err "verify 失败。查看详情：tail -50 /tmp/fortune-verify.log"
+  err "verify 失败。日志保存在：$VERIFY_LOG"
   echo
-  tail -10 /tmp/fortune-verify.log
+  tail -10 "$VERIFY_LOG"
+  exit 1
 fi
 
 # ─── Step 5: 报告 ──────────────────────────────────────────

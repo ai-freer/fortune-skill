@@ -18,6 +18,7 @@
  *   7. 综合评分
  */
 
+import { parseInteger } from './cli-input.mjs';
 import { createRequire } from 'module';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -37,13 +38,13 @@ function parseArgs() {
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--solar1' && args[i+1]) opts.solar1 = args[++i];
-    else if (a === '--hour1' && args[i+1]) opts.hour1 = parseInt(args[++i], 10);
-    else if (a === '--minute1' && args[i+1]) opts.minute1 = parseInt(args[++i], 10);
+    else if (a === '--hour1' && args[i+1]) opts.hour1 = parseInteger(args[++i]);
+    else if (a === '--minute1' && args[i+1]) opts.minute1 = parseInteger(args[++i]);
     else if (a === '--gender1' && args[i+1]) opts.gender1 = args[++i];
     else if (a === '--birthplace1' && args[i+1]) opts.birthplace1 = args[++i];
     else if (a === '--solar2' && args[i+1]) opts.solar2 = args[++i];
-    else if (a === '--hour2' && args[i+1]) opts.hour2 = parseInt(args[++i], 10);
-    else if (a === '--minute2' && args[i+1]) opts.minute2 = parseInt(args[++i], 10);
+    else if (a === '--hour2' && args[i+1]) opts.hour2 = parseInteger(args[++i]);
+    else if (a === '--minute2' && args[i+1]) opts.minute2 = parseInteger(args[++i]);
     else if (a === '--gender2' && args[i+1]) opts.gender2 = args[++i];
     else if (a === '--birthplace2' && args[i+1]) opts.birthplace2 = args[++i];
   }
@@ -61,7 +62,7 @@ function fail(error, message, input) {
 function getChart(solar, hour, minute, gender, birthplace) {
   try {
     const scriptPath = join(__dirname, 'bazi-chart.mjs');
-    const result = execFileSync('node', [
+    const result = execFileSync(process.execPath, [
       scriptPath, '--solar', solar, '--hour', String(hour),
       '--minute', String(minute), '--gender', gender, '--birthplace', birthplace
     ], { encoding: 'utf8', timeout: 15000, stdio: ['pipe', 'pipe', 'pipe'] });

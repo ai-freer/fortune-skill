@@ -8,7 +8,11 @@
     "*.docx",
     "*.xlsx",
     ".env",
-    ".env.*"
+    ".env.*",
+    "dev-archive/",
+    ".venv/",
+    ".remember/",
+    ".workbuddy/"
   ],
   "sensitiveKeywords": [
     "身份证",

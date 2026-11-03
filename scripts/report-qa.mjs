@@ -147,7 +147,7 @@ function check(content) {
     {
       id: 'birth_time_boundary',
       label: '时辰边界/时间校正',
-      pass: /时辰边界|真太阳时|时间校正|时辰校正/.test(content),
+      pass: /时辰边界|地方平太阳时|真太阳时|时间校正|时辰校正/.test(content),
       severity: 'warn'
     },
     {

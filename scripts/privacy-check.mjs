@@ -3,13 +3,13 @@
  * privacy-check.mjs — 检查 staged 内容中是否包含个人报告或明显敏感信息。
  *
  * 用法:
- *   node scripts/privacy-check.mjs
+ *   node scripts/privacy-check.mjs [--tracked | --no-git]
  */
 
 import { readFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,11 +17,12 @@ const root = join(__dirname, '..');
 const policyPath = join(root, 'references', 'privacy-policy.json');
 
 function runGit(args) {
-  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
-  if (result.status !== 0) {
-    return { ok: false, stdout: result.stdout || '', stderr: result.stderr || '' };
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 50 * 1024 * 1024, timeout: 30000 });
+  if (result.error || result.status !== 0) {
+    process.stdout.write(JSON.stringify({ ok: false, error: 'git_check_failed', message: result.error?.message || result.stderr?.trim() || 'Git command failed' }, null, 2) + '\n');
+    process.exit(1);
   }
-  return { ok: true, stdout: result.stdout || '', stderr: result.stderr || '' };
+  return result.stdout;
 }
 
 function loadPolicy() {
@@ -29,11 +30,12 @@ function loadPolicy() {
 }
 
 function hasPrivatePath(path, privatePaths) {
+  const name = basename(path);
   return privatePaths.some(pattern => {
-    if (pattern.endsWith('/')) return path.startsWith(pattern);
-    if (pattern.startsWith('*.')) return path.endsWith(pattern.slice(1));
-    if (pattern.endsWith('.*')) return path === pattern.slice(0, -2) || path.startsWith(pattern.slice(0, -1));
-    return path === pattern;
+    if (pattern.endsWith('/')) return (`/${path}`).includes(`/${pattern}`);
+    if (pattern.startsWith('*.')) return name.toLowerCase().endsWith(pattern.slice(1).toLowerCase());
+    if (pattern.endsWith('.*')) return name === pattern.slice(0, -2) || name.startsWith(pattern.slice(0, -1));
+    return name === pattern || path === pattern;
   });
 }
 
@@ -45,9 +47,8 @@ function sensitivePatternFindings(diffText) {
     { type: 'pem_private_key', pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, message: 'staged diff 中疑似出现 PEM 私钥' }
   ];
   return patterns.flatMap(item =>
-    [...diffText.matchAll(item.pattern)].map(match => ({
+    [...diffText.matchAll(item.pattern)].map(() => ({
       type: item.type,
-      sample: match[0].slice(0, 24),
       message: item.message
     }))
   );
@@ -58,6 +59,8 @@ function main() {
   if (process.argv.includes('--no-git')) {
     process.stdout.write(JSON.stringify({
       ok: true,
+      mode: 'policy-only',
+      contentScanned: false,
       policy: {
         privatePaths: policy.privatePaths,
         sensitiveKeywordCount: policy.sensitiveKeywords?.length || 0,
@@ -67,41 +70,39 @@ function main() {
     return;
   }
 
-  const staged = runGit(['diff', '--cached', '--name-only']);
-  const trackedReports = runGit(['ls-files', 'reports']);
-  const stagedDiff = runGit([
-    'diff',
-    '--cached',
-    '--',
-    '.',
-    ':(exclude)references/privacy-policy.json',
-    ':(exclude)scripts/privacy-check.mjs'
-  ]);
-
-  const stagedFiles = staged.stdout.split('\n').filter(Boolean);
+  const trackedMode = process.argv.includes('--tracked');
+  const stagedFiles = runGit(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']).split('\0').filter(Boolean);
+  const trackedFiles = runGit(['ls-files', '-z']).split('\0').filter(Boolean);
   const findings = [];
-
-  for (const file of stagedFiles) {
+  const files = trackedMode ? trackedFiles : stagedFiles;
+  for (const file of files) {
     if (hasPrivatePath(file, policy.privatePaths || [])) {
-      findings.push({ type: 'private_path_staged', file, message: '个人/敏感路径不应提交' });
+      findings.push({ type: trackedMode ? 'private_path_tracked' : 'private_path_staged', file, message: '个人/敏感路径不应提交' });
     }
   }
-
-  for (const file of trackedReports.stdout.split('\n').filter(Boolean)) {
-    findings.push({ type: 'tracked_report', file, message: 'reports/ 中已有文件被 git 跟踪，请确认是否确实要公开' });
+  // Check index contents, not local files. NUL-delimited names preserve Chinese,
+  // spaces and newlines. Deleting a private file must remain possible.
+  for (const file of trackedFiles.filter(file => (`/${file}`).includes('/reports/'))) {
+    if (!findings.some(item => item.file === file)) findings.push({ type: 'tracked_report', file, message: 'reports/ 中已有文件被 git 跟踪' });
   }
-
-  const diffText = stagedDiff.stdout || '';
-  const lowerDiffText = diffText.toLowerCase();
-  for (const keyword of policy.sensitiveKeywords || []) {
-    if (lowerDiffText.includes(String(keyword).toLowerCase())) {
-      findings.push({ type: 'sensitive_keyword', keyword, message: 'staged diff 中出现敏感关键词，请人工确认' });
+  if (trackedMode) {
+    for (const file of trackedFiles) {
+      const content = runGit(['show', `:${file}`]);
+      findings.push(...sensitivePatternFindings(content).map(item => ({ ...item, file })));
     }
+  } else {
+    const diff = runGit(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--unified=0', '--', '.', ':(exclude)references/privacy-policy.json', ':(exclude)scripts/privacy-check.mjs']);
+    const additions = diff.split('\n').filter(line => line.startsWith('+') && !line.startsWith('+++')).map(line => line.slice(1)).join('\n');
+    for (const keyword of policy.sensitiveKeywords || []) {
+      if (additions.toLowerCase().includes(String(keyword).toLowerCase())) findings.push({ type: 'sensitive_keyword', keyword, message: 'staged 新增内容出现敏感关键词，请人工确认' });
+    }
+    findings.push(...sensitivePatternFindings(additions));
   }
-  findings.push(...sensitivePatternFindings(diffText));
 
   const output = {
     ok: findings.length === 0,
+    mode: trackedMode ? 'tracked-index' : 'staged-additions',
+    contentScanned: true,
     stagedFiles,
     findings,
     policy: {

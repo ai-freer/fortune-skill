@@ -7,6 +7,7 @@
  *   node scripts/methodology-framework.mjs --summary
  */
 
+import { isMain } from './cli-entrypoint.mjs';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -71,4 +72,4 @@ function main() {
   process.stdout.write(JSON.stringify(output, null, 2) + '\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (isMain(import.meta.url)) main();

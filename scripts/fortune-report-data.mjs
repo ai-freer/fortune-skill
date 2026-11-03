@@ -9,6 +9,7 @@
  * 输出: JSON 到 stdout。用于长期流年、逐月报告、贵人线索等报告写作前的数据准备。
  */
 
+import { parseInteger } from './cli-input.mjs';
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -26,18 +27,18 @@ const python = process.env.PYTHON || 'python3';
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opts = { minute: 0, from: new Date().getFullYear(), to: new Date().getFullYear() + 9 };
+  const opts = { minute: 0, from: new Date(Date.now() + 8 * 3600000).getUTCFullYear(), to: new Date(Date.now() + 8 * 3600000).getUTCFullYear() + 9 };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--solar' && args[i + 1]) opts.solar = args[++i];
-    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInt(args[++i], 10);
-    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInt(args[++i], 10);
+    else if (args[i] === '--hour' && args[i + 1]) opts.hour = parseInteger(args[++i]);
+    else if (args[i] === '--minute' && args[i + 1]) opts.minute = parseInteger(args[++i]);
     else if (args[i] === '--gender' && args[i + 1]) opts.gender = args[++i];
     else if (args[i] === '--birthplace' && args[i + 1]) opts.birthplace = args[++i];
     else if (args[i] === '--calibration-file' && args[i + 1]) opts.calibrationFile = args[++i];
-    else if (args[i] === '--from' && args[i + 1]) opts.from = parseInt(args[++i], 10);
-    else if (args[i] === '--to' && args[i + 1]) opts.to = parseInt(args[++i], 10);
+    else if (args[i] === '--from' && args[i + 1]) opts.from = parseInteger(args[++i]);
+    else if (args[i] === '--to' && args[i + 1]) opts.to = parseInteger(args[++i]);
     else if (args[i] === '--ziwei-years' && args[i + 1]) {
-      opts.ziweiYears = args[++i].split(',').map(y => parseInt(y.trim(), 10)).filter(Number.isInteger);
+      opts.ziweiYears = args[++i].split(',').map(y => parseInteger(y.trim()));
     }
   }
   if (!opts.ziweiYears) opts.ziweiYears = [opts.from, opts.from + 1].filter(y => y <= opts.to);
@@ -55,20 +56,24 @@ function validate(opts) {
   if (opts.minute === undefined || Number.isNaN(opts.minute) || opts.minute < 0 || opts.minute > 59) fail('invalid_minute', '--minute 必须为 0-59', opts);
   if (!['male', 'female'].includes(opts.gender)) fail('invalid_gender', '--gender 必须为 male 或 female', opts);
   if (!opts.birthplace) fail('missing_birthplace', '缺少 --birthplace', opts);
-  if (!Number.isInteger(opts.from) || !Number.isInteger(opts.to) || opts.from > opts.to) fail('invalid_range', '--from/--to 范围无效', opts);
+  if (!Number.isInteger(opts.from) || !Number.isInteger(opts.to) || opts.from < 1 || opts.to > 9999 || opts.from > opts.to) fail('invalid_range', '--from/--to 范围无效', opts);
+  if (opts.ziweiYears.some(year => !Number.isInteger(year) || year < 1 || year > 9999)) fail('invalid_year', '--ziwei-years 必须为逗号分隔的有效年份', opts);
 }
 
 function runJsonCommand(label, command, args) {
   const result = spawnSync(command, args, {
     cwd: root,
+    env: { ...process.env, NODE: process.execPath },
     encoding: 'utf8',
     maxBuffer: 50 * 1024 * 1024
   });
   if (result.status !== 0) {
     fail('child_process_failed', `${label} 执行失败`, {
       status: result.status,
-      stdout: result.stdout.trim(),
-      stderr: result.stderr.trim()
+      stdout: (result.stdout || '').trim(),
+      stderr: (result.stderr || '').trim(),
+      error: result.error?.code || null,
+      signal: result.signal || null
     });
   }
   try {
@@ -97,7 +102,11 @@ function loadCalibration(file) {
   }
   try {
     const parsed = JSON.parse(readFileSync(file, 'utf8'));
-    const events = Array.isArray(parsed) ? parsed : (parsed.events || []);
+    if (!parsed || typeof parsed !== 'object') throw new Error('校准数据必须为对象或事件数组');
+    const events = Array.isArray(parsed) ? parsed : (parsed.events ?? []);
+    for (const [key, value] of Object.entries({ events, falsePositives: parsed.falsePositives ?? [], falseNegatives: parsed.falseNegatives ?? [] })) {
+      if (!Array.isArray(value) || value.some(event => !event || typeof event !== 'object' || Array.isArray(event))) throw new Error(`${key} 必须为事件对象数组`);
+    }
     return {
       status: events.length >= 5 ? '强校准' : events.length >= 3 ? '中校准' : events.length > 0 ? '弱校准' : '未校准',
       source: file,

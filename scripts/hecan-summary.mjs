@@ -8,6 +8,7 @@
  *   [--ziwei-years 2026,2027] [--focus career,migration]
  */
 
+import { isMain } from './cli-entrypoint.mjs';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -154,7 +155,7 @@ function runReportData(rawArgs) {
   if (result.status !== 0) {
     process.stdout.write(result.stdout || '');
     process.stderr.write(result.stderr || '');
-    process.exit(result.status);
+    process.exit(result.status ?? 1);
   }
 
   try {
@@ -619,6 +620,7 @@ function timeReliability(data) {
     };
   }
   const assumptions = [];
+  if (correction.precisionGuard?.historicalTimezoneAssumption) assumptions.push('历史时区待核实：本结果以城市代表时区规则为条件，不能视为唯一确定的历史命盘。');
   let penalty = 0;
   if (correction.boundary?.corrected?.nearBoundary) {
     penalty += 0.12;
@@ -629,7 +631,7 @@ function timeReliability(data) {
     assumptions.push('出生时间接近节气交界，月令和调候判断需保守。');
   }
   if (correction.shichenChanged) {
-    assumptions.push('标准时间与真太阳时对应时辰不同，正式结论以校正后时辰为准。');
+    assumptions.push('原始钟表时间与地方视太阳时近似对应时辰不同，正式结论以校正后时辰为准。');
   }
   return { penalty: clamp(penalty, 0, 0.24), assumptions };
 }
@@ -755,7 +757,12 @@ export function buildHecanSummary(data, focusDomains = null) {
     schemaVersion: 'fortune.hecanSummary.v2',
     input: data.input,
     timeBasis: {
-      principle: '真太阳时为正式排盘基准；标准时间仅作为原始输入。',
+      instant: data.base?.timeCorrection?.instant || null,
+      calendarPolicy: data.base?.timeCorrection?.calendarPolicy || null,
+      precisionGuard: data.base?.timeCorrection?.precisionGuard || null,
+      principle: '地方视太阳时近似为当前排盘基准，已加入 NOAA 均时差近似；出生地民用钟表时间仅作为原始输入。',
+      method: data.base?.timeCorrection?.trueSolarTime?.method ?? null,
+      equationOfTimeApplied: data.base?.timeCorrection?.trueSolarTime?.equationOfTimeApplied ?? null,
       corrected: data.base?.timeCorrection?.corrected || null,
       shichenChanged: Boolean(data.base?.timeCorrection?.shichenChanged),
       solarTermBoundary: data.base?.timeCorrection?.solarTermBoundary || null
@@ -792,4 +799,4 @@ function main() {
   process.stdout.write(JSON.stringify(output, null, 2) + '\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (isMain(import.meta.url)) main();

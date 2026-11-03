@@ -97,8 +97,10 @@ function auditSummary(output, findings) {
   for (const error of schema.errors) {
     findings.push(finding('schema_validation', 'error', error));
   }
-  if (!output.timeBasis?.principle?.includes('真太阳时')) {
-    findings.push(finding('time_basis_principle', 'error', '合参输出必须声明真太阳时为正式排盘基准。'));
+  if (!output.timeBasis?.principle?.includes('地方视太阳时近似') ||
+      output.timeBasis?.method !== 'local_apparent_solar_time_approximation' ||
+      output.timeBasis?.equationOfTimeApplied !== true) {
+    findings.push(finding('time_basis_principle', 'error', '合参输出必须明确地方视太阳时近似方法及已加入 NOAA 均时差近似，不得将近似算法宣称为高精度天文解。'));
   }
   if (!output.timeBasis?.corrected) {
     findings.push(finding('time_basis_corrected', 'warn', '未见校正后时间，时柱和紫微宫位应保守解释。'));

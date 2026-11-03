@@ -20,7 +20,13 @@ function validateLifeEventSignals(lifeEventSignals, errors, path = 'lifeEventSig
 }
 
 function validateTimeCorrection(timeCorrection, errors, path = 'timeCorrection') {
+  ensure(timeCorrection?.applied === true, `${path}.applied must be true`, errors);
   if (!timeCorrection?.applied) return;
+  ensure(Number.isFinite(Date.parse(timeCorrection.instant?.utc)), `${path}.instant.utc missing or invalid`, errors);
+  ensure(Boolean(timeCorrection.instant?.tzdbVersion && timeCorrection.instant?.tzifSha256), `${path}.instant timezone provenance missing`, errors);
+  ensure(timeCorrection.calendarPolicy?.version === 'utc-instant-v1', `${path}.calendarPolicy missing`, errors);
+  ensure(timeCorrection.trueSolarTime?.method === 'local_apparent_solar_time_approximation' && timeCorrection.trueSolarTime?.equationOfTimeApplied === true, `${path}.solar method inconsistent`, errors);
+  ensure(timeCorrection.precisionGuard?.reason === null, `${path}.precision guard must pass`, errors);
   ensure(Boolean(timeCorrection.boundary?.corrected), `${path}.boundary.corrected missing`, errors);
   ensure(Boolean(timeCorrection.solarTermBoundary?.checked), `${path}.solarTermBoundary missing`, errors);
 }
@@ -46,6 +52,7 @@ export function validateBaziOutput(output) {
   ensure(Boolean(output.fiveElements?.scores), 'fiveElements.scores missing', errors);
   validateTimeCorrection(output.timeCorrection, errors);
   if (output.mode === 'yearFortune') {
+    ensure(Boolean(output.yearFortune), 'yearFortune missing in yearFortune mode', errors);
     validateYearFortune(output.yearFortune, errors);
   } else {
     validateYearFortune(output.annualFortune, errors, 'annualFortune');

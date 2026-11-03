@@ -18,6 +18,7 @@ const python = process.env.PYTHON || 'python3';
 function run(label, command, args, expectCode = 0) {
   const result = spawnSync(command, args, {
     cwd: root,
+    env: { ...process.env, NODE: process.execPath },
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024
   });
@@ -47,6 +48,28 @@ function assert(condition, message) {
 
 const checks = [
   {
+    label: 'classical month data has complete unique keys and distinct lookup results',
+    run() { process.stdout.write(run(this.label, python, ['scripts/verify-vendor-data.py']).stdout); }
+  },
+  {
+    label: 'UTC time basis, pinned tzdb and complete skill framework regressions',
+    run() { process.stdout.write(run(this.label, node, ['scripts/verify-time-basis.mjs']).stdout); }
+  },
+  {
+    label: 'time, input, runtime and privacy hardening regressions',
+    run() {
+      const result = run(this.label, node, ['scripts/verify-hardening.mjs']);
+      process.stdout.write(result.stdout);
+    }
+  },
+  {
+    label: 'entrypoints handle encoded paths and imports without argv[1]',
+    run() {
+      const result = run(this.label, node, ['scripts/verify-entrypoints.mjs']);
+      process.stdout.write(result.stdout);
+    }
+  },
+  {
     label: 'time-normalize valid Shanghai DST case',
     run() {
       const result = run(this.label, node, [
@@ -57,9 +80,9 @@ const checks = [
       ]);
       const json = parseJson(this.label, result.stdout);
       assert(json.corrected.hour === 14, 'expected corrected hour 14');
-      assert(json.corrected.minute === 6, 'expected corrected minute 6');
+      assert(json.corrected.minute === 9, 'expected NOAA-corrected minute 9');
       assert(json.shichenChanged === true, 'expected shichenChanged true');
-      assert(json.boundary?.corrected?.minutesToNextBoundary === 54, 'expected corrected boundary distance 54');
+      assert(Math.abs(json.boundary?.corrected?.minutesToNextBoundary - 50.2) < 0.00001, 'expected unrounded corrected boundary distance 50.2');
       assert(json.solarTermBoundary?.near === false, 'expected non-boundary solar term state');
     }
   },
@@ -103,9 +126,9 @@ const checks = [
       ]);
       const json = parseJson(this.label, result.stdout);
       assert(json.city?.name === '马鞍山', 'expected 当涂 to resolve to 马鞍山');
-      assert(json.corrected.hour === 23, 'expected corrected hour 23');
-      assert(json.corrected.minute === 4, 'expected corrected minute 4');
-      assert(json.corrected.shichen === '子', 'expected corrected shichen 子');
+      assert(json.corrected.hour === 22, 'expected corrected hour 22');
+      assert(json.corrected.minute === 51, 'expected NOAA-corrected minute 51');
+      assert(json.corrected.shichen === '亥', 'expected corrected shichen 亥');
     }
   },
   {
@@ -212,8 +235,8 @@ const checks = [
         '--birthplace', '当涂'
       ]);
       const json = parseJson(this.label, result.stdout);
-      assert(json.timeCorrection.corrected.minute === 4, 'expected corrected minute 4');
-      assert(json.pillars.time.ganZhi === '甲子', 'expected 子时 pillar 甲子');
+      assert(json.timeCorrection.corrected.minute === 51, 'expected NOAA-corrected minute 51');
+      assert(json.pillars.time.ganZhi === '癸亥', 'expected corrected 亥时 pillar 癸亥');
     }
   },
   {
@@ -301,7 +324,7 @@ const checks = [
     }
   },
   {
-    label: 'privacy check clean when nothing staged',
+    label: 'privacy policy loads without scanning content',
     run() {
       const result = run(this.label, node, [
         'scripts/privacy-check.mjs',
@@ -401,7 +424,9 @@ const checks = [
       assert(json.summary?.evidenceNodeCount >= 3, 'expected v2 evidence nodes');
       assert(json.summary?.coveragePassCount === 3, 'expected focused domain coverage pass');
       assert(Array.isArray(json.summary?.domainCoverage), 'expected domain coverage summary');
-      assert(json.timeBasis?.principle?.includes('真太阳时'), 'expected true solar time principle');
+      assert(json.timeBasis?.principle?.includes('地方视太阳时近似'), 'expected local mean solar time principle');
+      assert(json.timeBasis.method === 'local_apparent_solar_time_approximation', 'expected explicit method');
+      assert(json.timeBasis.equationOfTimeApplied === true, 'expected equation-of-time limitation');
       assert(json.judgments.every(item => item.confidence >= 0 && item.confidence <= 1), 'expected confidence range');
       assert(json.judgments.some(item => item.domain === 'career'), 'expected career judgment');
       assert(json.judgments.every(item => item.evidence?.bazi && item.evidence?.ziwei && item.evidence?.rules), 'expected separated evidence');
@@ -425,6 +450,8 @@ const checks = [
         '--to', '2026',
         '--ziwei-years', '2026'
       ]);
+      assert(result.stdout.includes('时间基准：地方视太阳时近似，已加入 NOAA 均时差近似'), 'expected time-method disclosure');
+      assert(!result.stdout.includes('真太阳时'), 'no apparent-solar-time claim in generated draft');
       assert(result.stdout.includes('## 3.2 结构化合参 v2 判断卡片'), 'expected hecan v2 card section');
       assert(result.stdout.includes('## 3.3 v2 证据节点与反证摘要'), 'expected hecan v2 evidence digest section');
       assert(result.stdout.includes('覆盖策略'), 'expected v2 coverage policy output');
@@ -458,6 +485,12 @@ const checks = [
       assert(career.stdout.includes('## 4. 职业/平台变化信号'), 'expected career transition specialized section');
       const relationship = run(this.label, node, ['scripts/report-draft.mjs', '--type', 'relationship_family_report', ...commonArgs]);
       assert(relationship.stdout.includes('## 4. 关系与家庭议题信号'), 'expected relationship specialized section');
+      const mainLife = run(this.label, node, ['scripts/report-draft.mjs', '--type', 'main_life_report', ...commonArgs]);
+      const mainSummary = run(this.label, node, ['scripts/report-draft.mjs', '--type', 'main_summary_report', ...commonArgs]);
+      for (const report of [yearly, monthly, student, career, relationship, mainLife, mainSummary]) {
+        assert(report.stdout.includes('时间基准：地方视太阳时近似，已加入 NOAA 均时差近似'), 'all report templates disclose time approximation');
+        assert(!report.stdout.includes('真太阳时'), 'no apparent-solar-time claim in generated reports');
+      }
     }
 	  },
   {
@@ -530,7 +563,7 @@ const checks = [
 	      const file = join(root, '.tmp-report-qa.md');
 	      writeFileSync(file, [
 	        '# 测试报告',
-	        '时间校正和真太阳时：已检查时辰边界。',
+	        '时间校正和地方视太阳时近似：已检查时辰边界。',
 	        '方法论：经典规则索引、用神体系、作用优先级、紫微深化、历史经验校准、人生阶段模板均已核对。',
 	        '证据链：依据月支、日主、五行、大运、流年、四化落宫、宫位和神煞字段，不单独断事，强调现实承接和边界。',
 	        '现实校准：历史校准表已说明，个人经历由用户提供；未校准时保守解释。',
@@ -557,7 +590,7 @@ const checks = [
       writeFileSync(file, [
         '# 十年流年报告',
         '报告模板：long_year_month_report',
-        '时间校正和真太阳时：已检查时辰边界。',
+        '时间校正和地方视太阳时近似：已检查时辰边界。',
         '方法论：经典规则索引、用神体系。',
         '现实校准：未校准。',
         '维度：事业、财务、关系、健康、迁移。',
@@ -605,7 +638,7 @@ const checks = [
       const file = join(root, '.tmp-report-qa-student-bad.md');
       writeFileSync(file, [
         '# 学生与学业报告',
-        '时间校正和真太阳时：已检查时辰边界。',
+        '时间校正和地方视太阳时近似：已检查时辰边界。',
         '报告模板：student_report',
         '方法论：经典规则索引、用神体系、作用优先级、紫微深化、历史经验校准、人生阶段模板均已核对。',
         '现实校准：未校准。',
@@ -642,7 +675,7 @@ const checks = [
       const json = parseJson(this.label, result.stdout);
       assert(json.input.person1.minute === 10, 'expected minute1 to be preserved');
       assert(json.person1.timeCorrection.original.minute === 10, 'expected chart to receive minute1');
-      assert(json.person1.pillars.time.ganZhi === '甲子', 'expected boundary-sensitive 子时 pillar 甲子');
+      assert(json.person1.pillars.time.ganZhi === '癸亥', 'expected corrected 亥时 pillar 癸亥');
       assert(json.match.nayin?.elements?.person1, 'expected explicit nayin element mapping');
     }
   },
