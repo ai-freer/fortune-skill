@@ -18,6 +18,11 @@ import json
 import argparse
 import subprocess
 import collections
+
+# JSON is UTF-8 even when Windows redirects stdout to a pipe.
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 import re
 import calendar
 
@@ -81,7 +86,7 @@ def normalize_time(solar_date, hour, minute, birthplace):
         result = subprocess.run(
             [os.environ.get('NODE', 'node'), script_path, '--solar', solar_date, '--hour', str(hour),
              '--minute', str(minute), '--birthplace', birthplace],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, encoding="utf-8", timeout=10
         )
         if result.returncode == 0 and result.stdout.strip():
             return json.loads(result.stdout.strip())

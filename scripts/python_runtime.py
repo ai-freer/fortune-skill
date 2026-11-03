@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import subprocess
 
 
 def use_project_python():
@@ -19,6 +20,10 @@ def use_project_python():
         if os.environ.get('FORTUNE_PYTHON_REEXEC') == '1':
             raise RuntimeError('Python selection loop; check PYTHON and .venv')
         env = dict(os.environ, FORTUNE_PYTHON_REEXEC='1')
-        os.execve(resolved, [resolved, str(Path(sys.argv[0]).resolve()), *sys.argv[1:]], env)
+        command = [resolved, str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
+        if os.name == 'nt':
+            # Windows CRT exec replacement can crash with venv launchers.
+            raise SystemExit(subprocess.call(command, env=env))
+        os.execve(resolved, command, env)
     # The classic wrapper's Node child must use this same interpreter.
     os.environ['PYTHON'] = sys.executable

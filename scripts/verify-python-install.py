@@ -18,7 +18,7 @@ BIRTH = ['--solar', '1990-05-15', '--hour', '15', '--gender', 'male', '--birthpl
 
 
 def run(command, code=0, env=None):
-    result = subprocess.run(command, cwd=ROOT, env=env or ENV, text=True, capture_output=True, timeout=120)
+    result = subprocess.run(command, cwd=ROOT, env=env or ENV, text=True, encoding="utf-8", capture_output=True, timeout=120)
     if result.returncode != code:
         raise AssertionError(f'{command[0]} returned {result.returncode}: {result.stderr[-1500:]} {result.stdout[-1500:]}')
     return result
